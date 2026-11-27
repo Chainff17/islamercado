@@ -1,0 +1,23 @@
+{
+  "project": "islamercado",
+  "description": "Configuración oficial de Supabase para el repositorio islamercado (Cuban Marketplace).",
+  "warning": "Este Supabase NO es el del Gestor de Transferencias y pagos. Cada proyecto tiene su propio ref, region, claves y tablas. No los intercambies.",
+  "supabase": {
+    "project_name": "chain",
+    "project_ref": "xaumytmotnokdqbnxjgx",
+    "region": "us-west-2",
+    "api_url": "https://xaumytmotnokdqbnxjgx.supabase.co",
+    "database_host": "db.xaumytmotnokdqbnxjgx.supabase.co"
+  },
+  "env_vars": {
+    "supabaseUrl": "SUPABASE_URL",
+    "supabaseAnonKey": "SUPABASE_ANON_KEY",
+    "supabaseServiceRoleKey": "SUPABASE_SERVICE_ROLE_KEY"
+  },
+  "related_but_separate_projects": [
+    {
+      "name": "Gestor de Transferencias y pagos",
+      "note": "Proyecto Supabase aparte. Sus tablas (gestor_snapshots, gestor_preferencias, gestor_copias) y claves NO pertenecen a islamercado."
+    }
+  ]
+}

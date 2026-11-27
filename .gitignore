@@ -1,0 +1,17 @@
+# Dependencias
+node_modules/
+
+# Variables de entorno (contienen API keys — no versionar)
+.env
+.env.local
+.env.*.local
+
+# Build / logs
+dist/
+build/
+*.log
+
+# Editores / sistema
+.vscode/
+.idea/
+.DS_Store
