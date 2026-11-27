@@ -7,7 +7,8 @@ interface CartContextValue {
   items: CartItem[]
   loading: boolean
   count: number
-  total: number
+  /** Totales por moneda: { USD: 120, CUP: 6500 } */
+  totals: Record<string, number>
   add: (listingId: string, qty?: number) => Promise<void>
   remove: (listingId: string) => Promise<void>
   setQty: (listingId: string, qty: number) => Promise<void>
@@ -105,14 +106,19 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, [user, refresh])
 
   const count = useMemo(() => items.reduce((a, i) => a + i.quantity, 0), [items])
-  const total = useMemo(
-    () => items.reduce((a, i) => a + Number(i.listing?.price_usd ?? 0) * i.quantity, 0),
-    [items],
-  )
+  const totals = useMemo(() => {
+    const t: Record<string, number> = {}
+    for (const i of items) {
+      if (!i.listing) continue
+      const cur = i.listing.currency || 'USD'
+      t[cur] = (t[cur] ?? 0) + Number(i.listing.price_usd) * i.quantity
+    }
+    return t
+  }, [items])
 
   const value = useMemo(
-    () => ({ items, loading, count, total, add, remove, setQty, clear, refresh }),
-    [items, loading, count, total, add, remove, setQty, clear, refresh],
+    () => ({ items, loading, count, totals, add, remove, setQty, clear, refresh }),
+    [items, loading, count, totals, add, remove, setQty, clear, refresh],
   )
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>

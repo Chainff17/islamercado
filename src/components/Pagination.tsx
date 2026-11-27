@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react'
+import { Inbox } from 'lucide-react'
 
 export function LoadingBlock({ message = 'Cargando…' }: { message?: string }) {
   return (
@@ -20,7 +21,7 @@ export function EmptyState({
 }) {
   return (
     <div className="state-block empty-state">
-      <div className="empty-icon">📭</div>
+      <div className="empty-icon"><Inbox size={30} strokeWidth={1.4} /></div>
       <h3>{title}</h3>
       {message && <p>{message}</p>}
       {action}

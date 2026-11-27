@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { ImageOff } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { LISTING_SELECT, type Listing } from '../lib/types'
 import { useAuth } from '../context/AuthContext'
@@ -70,12 +71,12 @@ export default function MyListings() {
           {items.map((l) => (
             <div key={l.id} className="mylist-row">
               <Link to={`/publicacion/${l.id}`} className="cart-thumb">
-                {l.images?.[0] ? <img src={storageUrl(l.images[0])} alt="" /> : <span>📦</span>}
+                {l.images?.[0] ? <img src={storageUrl(l.images[0], 200)} alt="" /> : <ImageOff size={22} />}
               </Link>
               <div className="cart-info">
                 <Link to={`/publicacion/${l.id}`} className="cart-title">{l.title}</Link>
                 <div className="muted small">
-                  {formatPrice(l.price_usd, l.currency)} · Stock {l.stock} · 👁 {l.views} · {timeAgo(l.created_at)}
+                  {formatPrice(l.price_usd, l.currency, l.price_period)} · {l.price_period ? 'Alquiler' : `Stock ${l.stock}`} · {l.views} visitas · {timeAgo(l.created_at)}
                 </div>
                 <span className={`status-pill st-${l.status}`}>{STATUS_LABEL[l.status] ?? l.status}</span>
               </div>

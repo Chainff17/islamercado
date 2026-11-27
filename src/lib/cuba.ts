@@ -39,14 +39,50 @@ export function convert(amount: number, from: Currency, to: Currency): number {
   return usd * RATES[to]
 }
 
+/** Formato cubano: 18.500 · 1.250,50 (punto de miles, coma decimal). */
+export function formatAmount(amount: number): string {
+  const n = Number(amount) || 0
+  const whole = Math.abs(n - Math.round(n)) < 0.005
+  const fixed = whole ? String(Math.round(n)) : n.toFixed(2)
+  const [int, dec] = fixed.split('.')
+  const grouped = int.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+  return dec ? `${grouped},${dec}` : grouped
+}
+
 export function formatMoney(amount: number, currency: Currency): string {
-  const v = Number(amount).toLocaleString('es-CU', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })
-  if (currency === 'CUP') return `$${v} CUP`
-  if (currency === 'MLC') return `$${v} MLC`
-  return `$${v} USD`
+  return `${formatAmount(amount)} ${currency}`
+}
+
+export const PERIODS: { id: string; label: string }[] = [
+  { id: 'mes', label: 'por mes' },
+  { id: 'semana', label: 'por semana' },
+  { id: 'dia', label: 'por día' },
+  { id: 'noche', label: 'por noche' },
+  { id: 'hora', label: 'por hora' },
+]
+
+export function asCurrency(c: string | null | undefined): Currency {
+  return c === 'CUP' || c === 'MLC' ? c : 'USD'
+}
+
+/** Centro aproximado de cada provincia (para el mapa). */
+export const PROVINCE_COORDS: Record<string, [number, number]> = {
+  'Pinar del Río': [22.4175, -83.6981],
+  Artemisa: [22.8136, -82.7633],
+  'La Habana': [23.1136, -82.3666],
+  Mayabeque: [22.9617, -82.1511],
+  Matanzas: [23.0411, -81.5775],
+  Cienfuegos: [22.1461, -80.4356],
+  'Villa Clara': [22.4069, -79.9647],
+  'Sancti Spíritus': [21.9297, -79.4425],
+  'Ciego de Ávila': [21.84, -78.7619],
+  Camagüey: [21.3808, -77.9169],
+  'Las Tunas': [20.9617, -76.9511],
+  Granma: [20.3792, -76.6433],
+  Holguín: [20.8872, -76.2631],
+  'Santiago de Cuba': [20.0247, -75.8219],
+  Guantánamo: [20.1444, -75.2092],
+  'Isla de la Juventud': [21.8833, -82.8],
 }
 
 export const PAYMENT_METHODS: { id: string; label: string; hint: string }[] = [

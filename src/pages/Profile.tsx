@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { Heart, MessageCircle, Package, Plus, ShoppingBag, ShoppingCart, Store } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { initials } from '../lib/format'
@@ -121,25 +122,25 @@ export default function Profile() {
         <div className="profile-links card">
           <h3 className="card-h">Mis zonas</h3>
           <Link to="/publicar" className="profile-link">
-            <span className="pl-icon">📝</span> Publicar un artículo
+            <Plus size={18} className="pl-icon" /> Publicar anuncio
           </Link>
           <Link to="/mis-publicaciones" className="profile-link">
-            <span className="pl-icon">📋</span> Mis publicaciones
+            <Package size={18} className="pl-icon" /> Mis anuncios
           </Link>
           <Link to="/mis-compras" className="profile-link">
-            <span className="pl-icon">🛍️</span> Mis compras
+            <ShoppingBag size={18} className="pl-icon" /> Mis compras
           </Link>
           <Link to="/mis-ventas" className="profile-link">
-            <span className="pl-icon">💰</span> Mis ventas
+            <Store size={18} className="pl-icon" /> Mis ventas
           </Link>
           <Link to="/carrito" className="profile-link">
-            <span className="pl-icon">🛒</span> Mi carrito
+            <ShoppingCart size={18} className="pl-icon" /> Mi carrito
           </Link>
           <Link to="/mensajes" className="profile-link">
-            <span className="pl-icon">💬</span> Mis mensajes
+            <MessageCircle size={18} className="pl-icon" /> Mensajes
           </Link>
           <Link to="/favoritos" className="profile-link">
-            <span className="pl-icon">⭐</span> Mis favoritos
+            <Heart size={18} className="pl-icon" /> Favoritos
           </Link>
         </div>
       </div>

@@ -20,7 +20,7 @@ export default function Favorites() {
     setLoading(true)
     supabase
       .from('favorites')
-      .select('listing_id, listings ( id, seller_id, category_id, title, description, price_usd, currency, negotiable, condition, province, city, images, phone, status, views, stock, original_price, free_shipping, featured, created_at, updated_at )')
+      .select('listing_id, listings ( id, seller_id, category_id, title, description, price_usd, currency, negotiable, condition, province, city, images, phone, status, views, stock, original_price, free_shipping, featured, made_in_cuba, price_period, created_at, updated_at )')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .then(({ data }) => {

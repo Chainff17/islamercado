@@ -1,57 +1,77 @@
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { Heart, Leaf, MapPin, Sparkles, Tag, Percent, ImageOff } from 'lucide-react'
 import type { Listing } from '../lib/types'
 import { storageUrl } from '../lib/images'
-import { formatPrice, timeAgo, discountPct, conditionLabel } from '../lib/format'
-import { convert, formatMoney } from '../lib/cuba'
+import { timeAgo, discountPct } from '../lib/format'
+import { useFavorites } from '../context/FavoritesContext'
+import Price from './Price'
 
 interface Props {
   listing: Listing
 }
 
+function cardTag(l: Listing) {
+  if (l.status === 'sold') return { cls: 'tag-dark', Icon: Tag, label: 'Vendido' }
+  if (l.price_period) return { cls: '', Icon: Tag, label: 'Alquiler' }
+  if (l.featured) return { cls: '', Icon: Sparkles, label: 'Destacado' }
+  if (l.made_in_cuba) return { cls: '', Icon: Leaf, label: 'Hecho en Cuba' }
+  const pct = discountPct(Number(l.price_usd), l.original_price)
+  if (pct) return { cls: 'tag-deal', Icon: Percent, label: `${pct}% menos` }
+  return null
+}
+
 export default function ListingCard({ listing }: Props) {
-  const cover = listing.images?.[0] ? storageUrl(listing.images[0]) : ''
-  const pct = discountPct(Number(listing.price_usd), listing.original_price)
-  const sold = listing.status === 'sold'
-  const cup = convert(Number(listing.price_usd), (listing.currency as 'USD' | 'CUP' | 'MLC') || 'USD', 'CUP')
+  const navigate = useNavigate()
+  const fav = useFavorites()
+  const cover = listing.images?.[0] ? storageUrl(listing.images[0], 600) : ''
+  const tag = cardTag(listing)
+  const isFav = fav.isFavorite(listing.id)
+  const place = listing.city && listing.city !== listing.province ? `${listing.city}, ${listing.province}` : listing.province
+
+  async function onHeart() {
+    const ok = await fav.toggle(listing.id)
+    if (!ok) navigate('/entrar')
+  }
 
   return (
-    <Link to={`/publicacion/${listing.id}`} className={`listing-card ${sold ? 'is-sold' : ''}`}>
-      <div className="card-cover">
-        {cover ? (
-          <img src={cover} alt={listing.title} loading="lazy" />
-        ) : (
-          <div className="card-cover-empty">📦</div>
-        )}
-        <div className="card-badges">
-          {sold && <span className="badge badge-sold">VENDIDO</span>}
-          {pct && !sold && <span className="badge badge-off">-{pct}%</span>}
-          {listing.free_shipping && !sold && <span className="badge badge-ship">Envío gratis</span>}
-        </div>
-        {listing.stock <= 3 && listing.stock > 0 && !sold && (
-          <span className="card-stock">¡Quedan {listing.stock}!</span>
-        )}
-      </div>
-
-      <div className="card-body">
-        <h3 className="card-title">{listing.title}</h3>
-        <div className="card-price-row">
-          <span className="card-price">{formatPrice(listing.price_usd, listing.currency)}</span>
-          {listing.original_price && (
-            <span className="card-old">{formatPrice(listing.original_price, listing.currency)}</span>
+    <article className={`lcard ${listing.status === 'sold' ? 'is-sold' : ''}`}>
+      <Link to={`/publicacion/${listing.id}`} className="lcard-link">
+        <div className="lcard-media">
+          {cover ? (
+            <img src={cover} alt={listing.title} loading="lazy" decoding="async" />
+          ) : (
+            <div className="lcard-noimg">
+              <ImageOff size={28} strokeWidth={1.4} />
+            </div>
+          )}
+          {tag && (
+            <span className={`tag ${tag.cls}`}>
+              <tag.Icon size={12} strokeWidth={2} />
+              {tag.label}
+            </span>
           )}
         </div>
-        <div className="card-cup">≈ {formatMoney(cup, 'CUP')}</div>
-        <div className="card-install">en 3 cuotas sin interés</div>
-        <div className="card-meta">
-          <span className="card-location">📍 {listing.province}</span>
-          <span className="card-views">👁 {listing.views ?? 0}</span>
+        <div className="lcard-body">
+          <Price value={listing.price_usd} currency={listing.currency} period={listing.price_period} size="lg" />
+          <h3 className="lcard-title">{listing.title}</h3>
+          <div className="lcard-meta">
+            <span className="lcard-place">
+              <MapPin size={13} strokeWidth={1.8} />
+              {place}
+            </span>
+            <span className="lcard-time">{timeAgo(listing.created_at)}</span>
+          </div>
         </div>
-        <div className="card-foot">
-          <span className="badge badge-condition">{conditionLabel(listing.condition)}</span>
-          {listing.negotiable && <span className="badge badge-negotiable">Negociable</span>}
-          <span className="card-time">{timeAgo(listing.created_at)}</span>
-        </div>
-      </div>
-    </Link>
+      </Link>
+      <button
+        type="button"
+        className={`heart-btn ${isFav ? 'is-on' : ''}`}
+        onClick={onHeart}
+        aria-label={isFav ? 'Quitar de favoritos' : 'Guardar en favoritos'}
+        aria-pressed={isFav}
+      >
+        <Heart size={18} strokeWidth={1.8} fill={isFav ? 'currentColor' : 'none'} />
+      </button>
+    </article>
   )
 }

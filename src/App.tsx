@@ -1,5 +1,6 @@
-import { useEffect } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { Routes, Route, useLocation, Link } from 'react-router-dom'
+import { TreePalm } from 'lucide-react'
 import Header from './components/Header'
 import Home from './pages/Home'
 import Browse from './pages/Browse'
@@ -16,10 +17,14 @@ import Cart from './pages/Cart'
 import Checkout from './pages/Checkout'
 import Orders from './pages/Orders'
 import MyListings from './pages/MyListings'
+import Categories from './pages/Categories'
+import { LoadingBlock } from './components/Pagination'
+
+// El mapa (Leaflet) se descarga solo cuando se visita: ahorra datos en la portada.
+const MapPage = lazy(() => import('./pages/MapPage'))
 
 function ScrollToTop() {
   const { pathname } = useLocation()
-
   useEffect(() => {
     window.scrollTo(0, 0)
   }, [pathname])
@@ -31,54 +36,71 @@ export default function App() {
     <div className="app-shell">
       <ScrollToTop />
       <Header />
-      <main className="main-content">
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/buscar" element={<Browse />} />
-          <Route path="/categoria/:slug" element={<Browse />} />
-          <Route path="/publicacion/:id" element={<ListingDetail />} />
-          <Route path="/vendedor/:id" element={<SellerProfile />} />
-          <Route path="/mensajes" element={<Messages />} />
-          <Route path="/mensajes/:listingId" element={<Messages />} />
-          <Route path="/favoritos" element={<Favorites />} />
-          <Route path="/publicar" element={<NewListing />} />
-          <Route path="/editar/:id" element={<NewListing />} />
-          <Route path="/carrito" element={<Cart />} />
-          <Route path="/checkout" element={<Checkout />} />
-          <Route path="/mis-compras" element={<Orders mode="compras" />} />
-          <Route path="/mis-ventas" element={<Orders mode="ventas" />} />
-          <Route path="/mis-publicaciones" element={<MyListings />} />
-          <Route path="/entrar" element={<Login />} />
-          <Route path="/registro" element={<Register />} />
-          <Route path="/perfil" element={<Profile />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+      <main className="main-content container">
+        <Suspense fallback={<LoadingBlock />}>
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/buscar" element={<Browse />} />
+            <Route path="/categorias" element={<Categories />} />
+            <Route path="/categoria/:slug" element={<Browse />} />
+            <Route path="/mapa" element={<MapPage />} />
+            <Route path="/publicacion/:id" element={<ListingDetail />} />
+            <Route path="/vendedor/:id" element={<SellerProfile />} />
+            <Route path="/mensajes" element={<Messages />} />
+            <Route path="/mensajes/:listingId" element={<Messages />} />
+            <Route path="/favoritos" element={<Favorites />} />
+            <Route path="/publicar" element={<NewListing />} />
+            <Route path="/editar/:id" element={<NewListing />} />
+            <Route path="/carrito" element={<Cart />} />
+            <Route path="/checkout" element={<Checkout />} />
+            <Route path="/mis-compras" element={<Orders mode="compras" />} />
+            <Route path="/mis-ventas" element={<Orders mode="ventas" />} />
+            <Route path="/mis-publicaciones" element={<MyListings />} />
+            <Route path="/entrar" element={<Login />} />
+            <Route path="/registro" element={<Register />} />
+            <Route path="/perfil" element={<Profile />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </Suspense>
       </main>
-      <footer className="app-footer">
-        <div className="footer-inner footer-grid">
-          <div>
-            <strong>🏝️ Isla Mercado 🇨🇺</strong>
-            <p className="footer-note">El mercado online del pueblo cubano. Compra y vende de Pinar del Río a Guantánamo.</p>
+      <footer className="site-footer">
+        <div className="container footer-grid">
+          <div className="footer-brand">
+            <Link to="/" className="logo logo-sm">
+              <span className="logo-mark">
+                <TreePalm size={18} strokeWidth={1.8} />
+              </span>
+              <span className="logo-text">
+                IslaMercado<span className="logo-dot">.</span>
+              </span>
+            </Link>
+            <p>Compra y vende con la gente de aquí. De Pinar del Río a Guantánamo, todo en un solo lugar.</p>
           </div>
-          <div>
+          <nav>
             <strong>Comprar</strong>
-            <Link to="/buscar">Explorar</Link>
-            <Link to="/buscar?ofertas=1">Ofertas</Link>
-            <Link to="/carrito">Carrito</Link>
-            <Link to="/mis-compras">Mis compras</Link>
-          </div>
-          <div>
+            <Link to="/buscar">Anuncios recientes</Link>
+            <Link to="/categorias">Categorías</Link>
+            <Link to="/mapa">Mapa</Link>
+            <Link to="/buscar?cubano=1">Hecho en Cuba</Link>
+          </nav>
+          <nav>
             <strong>Vender</strong>
-            <Link to="/publicar">Publicar gratis</Link>
-            <Link to="/mis-publicaciones">Mis publicaciones</Link>
+            <Link to="/publicar">Publicar anuncio</Link>
+            <Link to="/mis-publicaciones">Mis anuncios</Link>
             <Link to="/mis-ventas">Mis ventas</Link>
-          </div>
-          <div>
-            <strong>Pagos aceptados</strong>
-            <span className="footer-note">Transfermóvil · Zelle · CUP · USD · MLC · Contra entrega</span>
-          </div>
+          </nav>
+          <nav>
+            <strong>Mi cuenta</strong>
+            <Link to="/perfil">Perfil</Link>
+            <Link to="/mis-compras">Mis compras</Link>
+            <Link to="/mensajes">Mensajes</Link>
+            <Link to="/favoritos">Favoritos</Link>
+          </nav>
         </div>
-        <div className="footer-bottom">© {new Date().getFullYear()} Isla Mercado · Hecho con ❤️ para Cuba</div>
+        <div className="container footer-bottom">
+          <span>© {new Date().getFullYear()} IslaMercado · Hecho con cariño en Cuba</span>
+          <span>Pagos: Transfermóvil · Zelle · efectivo CUP, USD o MLC</span>
+        </div>
       </footer>
     </div>
   )

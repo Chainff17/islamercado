@@ -5,7 +5,8 @@ import { LISTING_SELECT, type Category, type Listing } from '../lib/types'
 import { uploadImage, storageUrl } from '../lib/images'
 import { LoadingBlock, EmptyState, Alert } from '../components/Pagination'
 import { useAuth } from '../context/AuthContext'
-import { CURRENCIES, PROVINCES } from '../lib/cuba'
+import { CURRENCIES, PERIODS, PROVINCES } from '../lib/cuba'
+import { ImagePlus, Leaf, Tag, Truck, Handshake, X } from 'lucide-react'
 
 const EMPTY = {
   title: '',
@@ -20,6 +21,8 @@ const EMPTY = {
   phone: '',
   negotiable: false,
   free_shipping: false,
+  made_in_cuba: false,
+  price_period: '',
   description: '',
 }
 
@@ -74,6 +77,8 @@ export default function NewListing() {
             phone: l.phone ?? '',
             negotiable: l.negotiable,
             free_shipping: l.free_shipping,
+            made_in_cuba: l.made_in_cuba ?? false,
+            price_period: l.price_period ?? '',
             description: l.description ?? '',
           })
           setImages(l.images ?? [])
@@ -135,6 +140,8 @@ export default function NewListing() {
       stock,
       negotiable: form.negotiable,
       free_shipping: form.free_shipping,
+      made_in_cuba: form.made_in_cuba,
+      price_period: form.price_period || null,
       condition: form.condition,
       province: form.province,
       city: form.city.trim() || null,
@@ -164,11 +171,11 @@ export default function NewListing() {
   return (
     <div className="page new-listing">
       <div className="page-head">
-        <h1>{editId ? 'Editar publicación' : '¿Qué vas a vender?'}</h1>
+        <h1 className="page-title"><Tag size={24} strokeWidth={1.6} className="title-icon" /> {editId ? 'Editar anuncio' : 'Publicar anuncio'}</h1>
         <p className="page-sub">Publicar es gratis. Buenas fotos y una descripción clara venden más rápido.</p>
       </div>
 
-      <form className="form card" onSubmit={onSubmit}>
+      <form className="form panel form-wide" onSubmit={onSubmit}>
         <label className="field">
           <span>Título *</span>
           <input type="text" value={form.title} maxLength={120} onChange={(e) => update('title', e.target.value)} placeholder='Ej: Smart TV Samsung 43" 4K con control' required />
@@ -211,9 +218,25 @@ export default function NewListing() {
           </label>
         </div>
 
+        <div className="form-row">
+          <label className="field">
+            <span>Tipo de anuncio</span>
+            <select value={form.price_period} onChange={(e) => update('price_period', e.target.value)}>
+              <option value="">Venta</option>
+              {PERIODS.map((p) => (
+                <option key={p.id} value={p.id}>Alquiler {p.label}</option>
+              ))}
+            </select>
+          </label>
+          <div className="field">
+            <span>&nbsp;</span>
+            <small className="hint">{form.price_period ? `El precio se mostrará «/ ${form.price_period}». Los alquileres no descuentan stock.` : 'Se descuenta stock con cada compra confirmada.'}</small>
+          </div>
+        </div>
+
         <div className="form-row form-row-3">
           <label className="field">
-            <span>Stock disponible *</span>
+            <span>{form.price_period ? 'Unidades disponibles *' : 'Stock disponible *'}</span>
             <input type="number" min="1" step="1" value={form.stock} onChange={(e) => update('stock', e.target.value)} required />
           </label>
           <label className="field">
@@ -234,13 +257,20 @@ export default function NewListing() {
         </label>
 
         <div className="checks">
-          <label className="checkbox-field">
+          <label className="check-card">
             <input type="checkbox" checked={form.negotiable} onChange={(e) => update('negotiable', e.target.checked)} />
+            <Handshake size={18} strokeWidth={1.6} />
             <span>Precio negociable</span>
           </label>
-          <label className="checkbox-field">
+          <label className="check-card">
             <input type="checkbox" checked={form.free_shipping} onChange={(e) => update('free_shipping', e.target.checked)} />
-            <span>Ofrezco envío gratis</span>
+            <Truck size={18} strokeWidth={1.6} />
+            <span>Envío gratis</span>
+          </label>
+          <label className="check-card">
+            <input type="checkbox" checked={form.made_in_cuba} onChange={(e) => update('made_in_cuba', e.target.checked)} />
+            <Leaf size={18} strokeWidth={1.6} />
+            <span>Hecho en Cuba</span>
           </label>
         </div>
 
@@ -257,12 +287,13 @@ export default function NewListing() {
               <div key={img + i} className="image-preview-item">
                 <img src={storageUrl(img)} alt={`Imagen ${i + 1}`} />
                 {i === 0 && <span className="cover-tag">Portada</span>}
-                <button type="button" onClick={() => setImages((p) => p.filter((_, idx) => idx !== i))} className="img-remove">✕</button>
+                <button type="button" onClick={() => setImages((p) => p.filter((_, idx) => idx !== i))} className="img-remove" aria-label="Quitar foto"><X size={12} /></button>
               </div>
             ))}
             {images.length < 8 && (
               <button type="button" className="image-add" onClick={() => fileRef.current?.click()} disabled={uploading}>
-                {uploading ? 'Subiendo…' : '＋ Añadir fotos'}
+                <ImagePlus size={22} strokeWidth={1.5} />
+                <span>{uploading ? 'Subiendo…' : 'Añadir fotos'}</span>
               </button>
             )}
           </div>
