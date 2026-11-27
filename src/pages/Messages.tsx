@@ -12,6 +12,7 @@ interface Conversation {
   listingTitle: string
   listingImage: string
   listingPrice: number
+  listingCurrency: string
   otherId: string
   otherName: string
   messages: Message[]
@@ -43,7 +44,7 @@ export default function Messages() {
       .from('messages')
       .select(
         `id, listing_id, sender_id, receiver_id, body, read_at, created_at,
-         listings ( title, price_usd, images, status ),
+         listings ( title, price_usd, currency, images, status ),
          profiles ( username )`,
       )
       .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
@@ -67,6 +68,7 @@ export default function Messages() {
               listingTitle: m.listings?.title ?? 'Publicación',
               listingImage: m.listings?.images?.[0] ?? '',
               listingPrice: m.listings?.price_usd ?? 0,
+              listingCurrency: m.listings?.currency ?? 'USD',
               otherId,
               otherName: m.profiles?.username ?? 'Vendedor',
               messages: [],
@@ -137,7 +139,7 @@ export default function Messages() {
       .from('messages')
       .select(
         `id, listing_id, sender_id, receiver_id, body, read_at, created_at,
-         listings ( title, price_usd, images, status ),
+         listings ( title, price_usd, currency, images, status ),
          profiles ( username )`,
       )
       .eq('listing_id', current.listingId)
@@ -224,7 +226,7 @@ export default function Messages() {
                     <img className="thread-thumb" src={storageUrl(current.listingImage)} alt="" />
                   )}
                   <span>{current.listingTitle}</span>
-                  <span className="thread-price">{formatPrice(current.listingPrice)}</span>
+                  <span className="thread-price">{formatPrice(current.listingPrice, current.listingCurrency)}</span>
                 </Link>
                 <div className="thread-with">Con {current.otherName}</div>
               </div>

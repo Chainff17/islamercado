@@ -3,8 +3,11 @@ import { Link, useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { LISTING_SELECT, type Category, type Listing, type Profile, type Question, type Review } from '../lib/types'
 import { storageUrl } from '../lib/images'
-import { formatPrice, timeAgo, discountPct, conditionLabel, formatDate } from '../lib/format'
-import { convert, formatMoney, whatsappLink, type Currency } from '../lib/cuba'
+import { timeAgo, discountPct, conditionLabel, formatDate } from '../lib/format'
+import { asCurrency, convert, formatMoney, whatsappLink } from '../lib/cuba'
+import Price from '../components/Price'
+import { useFavorites } from '../context/FavoritesContext'
+import { Eye, Heart, Leaf, MapPin, MessageCircle, Phone, ShieldCheck, ShoppingBag, Sparkles, Tag, Truck, Handshake, Clock, ChevronRight } from 'lucide-react'
 import { Stars, ReviewItem } from '../components/Stars'
 import ListingCard from '../components/ListingCard'
 import { LoadingBlock, EmptyState, Alert } from '../components/Pagination'
@@ -16,6 +19,7 @@ export default function ListingDetail() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const cart = useCart()
+  const fav = useFavorites()
 
   const [listing, setListing] = useState<Listing | null>(null)
   const [category, setCategory] = useState<Category | null>(null)
@@ -24,7 +28,6 @@ export default function ListingDetail() {
   const [reviews, setReviews] = useState<Review[]>([])
   const [questions, setQuestions] = useState<Question[]>([])
   const [related, setRelated] = useState<Listing[]>([])
-  const [isFavorite, setIsFavorite] = useState(false)
   const [activeImage, setActiveImage] = useState(0)
   const [qty, setQty] = useState(1)
   const [body, setBody] = useState('')
@@ -85,15 +88,6 @@ export default function ListingDetail() {
 
         supabase.rpc('increment_listing_views', { p_id: l.id }).then(() => {})
 
-        if (user) {
-          supabase
-            .from('favorites')
-            .select('listing_id')
-            .eq('user_id', user.id)
-            .eq('listing_id', l.id)
-            .maybeSingle()
-            .then(({ data: fav }) => active && setIsFavorite(!!fav))
-        }
       })
     return () => {
       active = false
@@ -109,14 +103,9 @@ export default function ListingDetail() {
   }
 
   async function toggleFavorite() {
-    if (!requireLogin() || !listing) return
-    if (isFavorite) {
-      await supabase.from('favorites').delete().eq('user_id', user!.id).eq('listing_id', listing.id)
-      setIsFavorite(false)
-    } else {
-      await supabase.from('favorites').insert({ user_id: user!.id, listing_id: listing.id })
-      setIsFavorite(true)
-    }
+    if (!listing) return
+    const ok = await fav.toggle(listing.id)
+    if (!ok) navigate('/entrar')
   }
 
   async function addToCart() {
@@ -125,7 +114,7 @@ export default function ListingDetail() {
     setError('')
     try {
       await cart.add(listing.id, qty)
-      setNotice('✓ Agregado al carrito')
+      setNotice('Agregado al carrito')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo agregar al carrito')
     } finally {
@@ -194,20 +183,37 @@ export default function ListingDetail() {
   const isOwner = user?.id === listing.seller_id
   const available = listing.status === 'active' && listing.stock > 0
   const pct = discountPct(Number(listing.price_usd), listing.original_price)
-  const cur = (listing.currency || 'USD') as Currency
+  const cur = asCurrency(listing.currency)
+  const isFavorite = fav.isFavorite(listing.id)
+  const isRental = !!listing.price_period
   const avg = avgRating(reviews)
   const wa = whatsappLink(listing.phone || seller?.phone, `Hola, me interesa "${listing.title}" en Isla Mercado`)
 
   return (
     <div className="detail-page">
-      <nav className="breadcrumb">
-        <Link to="/">Inicio</Link> ›{' '}
-        {category ? <Link to={`/categoria/${category.slug}`}>{category.name}</Link> : 'Artículos'} ›{' '}
-        <span>{listing.title}</span>
+      <nav className="crumbs">
+        <Link to="/">Inicio</Link> <span>/</span>{' '}
+        {category ? <Link to={`/categoria/${category.slug}`}>{category.name}</Link> : 'Anuncios'} <span>/</span>{' '}
+        <span className="crumb-current">{listing.title}</span>
       </nav>
 
-      <div className="listing-detail card">
-        <div className="gallery">
+      <div className="detail-top">
+        <div className="gallery panel">
+          <div className="gallery-main">
+            {images.length > 0 ? (
+              <img src={storageUrl(images[activeImage], 1200)} alt={listing.title} />
+            ) : (
+              <div className="gallery-empty">Sin fotos</div>
+            )}
+            <button
+              type="button"
+              className={`heart-btn heart-lg ${isFavorite ? 'is-on' : ''}`}
+              onClick={toggleFavorite}
+              aria-label={isFavorite ? 'Quitar de favoritos' : 'Guardar en favoritos'}
+            >
+              <Heart size={20} strokeWidth={1.8} fill={isFavorite ? 'currentColor' : 'none'} />
+            </button>
+          </div>
           {images.length > 1 && (
             <div className="gallery-thumbs">
               {images.map((img, i) => (
@@ -215,86 +221,85 @@ export default function ListingDetail() {
                   key={i}
                   type="button"
                   className={`thumb ${i === activeImage ? 'thumb-active' : ''}`}
-                  onMouseEnter={() => setActiveImage(i)}
                   onClick={() => setActiveImage(i)}
+                  aria-label={`Foto ${i + 1}`}
                 >
-                  <img src={storageUrl(img)} alt={`${listing.title} ${i + 1}`} />
+                  <img src={storageUrl(img, 160)} alt="" />
                 </button>
               ))}
             </div>
           )}
-          <div className="gallery-main">
-            {images.length > 0 ? (
-              <img src={storageUrl(images[activeImage])} alt={listing.title} />
-            ) : (
-              <div className="gallery-empty">📦</div>
-            )}
-          </div>
         </div>
 
-        <div className="buy-box">
-          <div className="buy-sub">
-            {conditionLabel(listing.condition)} · {listing.views ?? 0} vistas · {timeAgo(listing.created_at)}
+        <div className="buy-box panel">
+          <div className="buy-tags">
+            {isRental && <span className="tag tag-static"><Tag size={12} /> Alquiler</span>}
+            {listing.featured && <span className="tag tag-static"><Sparkles size={12} /> Destacado</span>}
+            {listing.made_in_cuba && <span className="tag tag-static"><Leaf size={12} /> Hecho en Cuba</span>}
+            <span className="tag tag-static tag-plain">{conditionLabel(listing.condition)}</span>
           </div>
           <h1 className="detail-title">{listing.title}</h1>
-          {reviews.length > 0 && (
-            <div className="seller-rating">
-              <Stars value={avg} size="sm" /> <span>{avg.toFixed(1)} ({reviews.length})</span>
-            </div>
-          )}
-
-          {listing.original_price && <div className="old-price">{formatPrice(listing.original_price, cur)}</div>}
-          <div className="detail-price-row">
-            <span className="detail-price">{formatPrice(listing.price_usd, cur)}</span>
-            {pct && <span className="off-pill">{pct}% OFF</span>}
+          <div className="detail-meta">
+            <span><MapPin size={14} /> {listing.city && listing.city !== listing.province ? `${listing.city}, ` : ''}{listing.province}</span>
+            <span><Clock size={14} /> {timeAgo(listing.created_at)}</span>
+            <span><Eye size={14} /> {listing.views ?? 0} visitas</span>
           </div>
-          <div className="price-alt">
-            ≈ {formatMoney(convert(Number(listing.price_usd), cur, 'CUP'), 'CUP')} · ≈{' '}
-            {formatMoney(convert(Number(listing.price_usd), cur, 'MLC'), 'MLC')}
-          </div>
-          <div className="installments">Paga con Transfermóvil, Zelle o contra entrega</div>
 
-          <div className="ship-box">
-            {listing.free_shipping ? (
-              <p className="ship-free">🚚 <strong>Envío gratis</strong> a toda Cuba</p>
-            ) : (
-              <p>🚚 Envío a coordinar con el vendedor</p>
+          <div className="detail-price-block">
+            {listing.original_price && (
+              <div className="old-price">
+                {formatMoney(Number(listing.original_price), cur)} {pct && <span className="off">−{pct}%</span>}
+              </div>
             )}
-            <p className="muted">📍 Sale desde {listing.city ? `${listing.city}, ` : ''}{listing.province}</p>
+            <Price value={listing.price_usd} currency={cur} period={listing.price_period} size="xl" />
+            <div className="price-alt">
+              {cur === 'CUP'
+                ? `≈ ${formatMoney(convert(Number(listing.price_usd), 'CUP', 'USD'), 'USD')}`
+                : `≈ ${formatMoney(convert(Number(listing.price_usd), cur, 'CUP'), 'CUP')}`}
+              {listing.negotiable && <span className="negotiable"><Handshake size={14} /> Negociable</span>}
+            </div>
+          </div>
+
+          <div className="ship-line">
+            <Truck size={17} strokeWidth={1.7} />
+            {listing.free_shipping ? <span><strong>Envío gratis</strong> a toda Cuba</span> : <span>Entrega a coordinar con el vendedor</span>}
           </div>
 
           {available ? (
             <>
-              <div className="stock-line">
-                <strong>Stock disponible</strong>
-                <span className="muted"> ({listing.stock} disponible{listing.stock !== 1 ? 's' : ''})</span>
-              </div>
-              {listing.stock > 1 && (
-                <label className="qty-select">
-                  Cantidad:
-                  <select value={qty} onChange={(e) => setQty(Number(e.target.value))}>
-                    {Array.from({ length: Math.min(listing.stock, 10) }, (_, i) => i + 1).map((n) => (
-                      <option key={n} value={n}>{n} unidad{n > 1 ? 'es' : ''}</option>
-                    ))}
-                  </select>
-                </label>
+              {!isRental && (
+                <div className="stock-row">
+                  <span>{listing.stock === 1 ? 'Última unidad' : `${listing.stock} disponibles`}</span>
+                  {listing.stock > 1 && (
+                    <label className="qty-select">
+                      Cantidad
+                      <select value={qty} onChange={(e) => setQty(Number(e.target.value))}>
+                        {Array.from({ length: Math.min(listing.stock, 10) }, (_, i) => i + 1).map((n) => (
+                          <option key={n} value={n}>{n}</option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
+                </div>
               )}
               {isOwner ? (
-                <Alert kind="info">Esta es tu publicación. <Link to="/mis-publicaciones">Gestionarla</Link></Alert>
+                <Alert kind="info">Este es tu anuncio. <Link to={`/editar/${listing.id}`}>Editarlo</Link> · <Link to="/mis-publicaciones">Mis anuncios</Link></Alert>
               ) : (
                 <div className="buy-actions">
                   <button type="button" className="btn btn-primary btn-lg btn-block" onClick={buyNow}>
-                    Comprar ahora
+                    {isRental ? 'Solicitar alquiler' : 'Comprar ahora'}
                   </button>
-                  <button type="button" className="btn btn-soft btn-lg btn-block" onClick={addToCart} disabled={busy}>
-                    Agregar al carrito
-                  </button>
+                  {!isRental && (
+                    <button type="button" className="btn btn-light btn-lg btn-block" onClick={addToCart} disabled={busy}>
+                      <ShoppingBag size={17} /> Agregar al carrito
+                    </button>
+                  )}
                 </div>
               )}
             </>
           ) : (
             <Alert kind="info">
-              {listing.status === 'sold' ? 'Este artículo ya fue vendido.' : 'Esta publicación está pausada.'}
+              {listing.status === 'sold' ? 'Este artículo ya se vendió.' : 'Este anuncio está pausado por el vendedor.'}
             </Alert>
           )}
 
@@ -305,32 +310,27 @@ export default function ListingDetail() {
           )}
           {error && <Alert kind="error">{error}</Alert>}
 
-          <button type="button" className={`btn btn-link ${isFavorite ? 'fav-on' : ''}`} onClick={toggleFavorite}>
-            {isFavorite ? '♥ En favoritos' : '♡ Agregar a favoritos'}
-          </button>
-
           <ul className="guarantees">
-            <li>🛡️ <strong>Compra protegida:</strong> si no recibes el producto, cancelas el pedido.</li>
-            <li>💬 Habla con el vendedor antes de pagar.</li>
-            {listing.negotiable && <li>🤝 Precio negociable.</li>}
+            <li><ShieldCheck size={16} /> Puedes cancelar mientras el pedido esté pendiente.</li>
+            <li><MessageCircle size={16} /> Habla con el vendedor antes de pagar.</li>
           </ul>
         </div>
       </div>
 
       <div className="detail-grid">
         <div className="detail-left">
-          <section className="card">
-            <h2 className="card-h">Descripción</h2>
-            <p className="detail-desc">{listing.description || 'Sin descripción.'}</p>
+          <section className="panel">
+            <h2 className="panel-title">Descripción</h2>
+            <p className="detail-desc">{listing.description || 'El vendedor no añadió descripción.'}</p>
           </section>
 
-          <section className="card">
-            <h2 className="card-h">Preguntas y respuestas</h2>
+          <section className="panel">
+            <h2 className="panel-title">Preguntas al vendedor</h2>
             {!isOwner && (
               <form className="ask-form" onSubmit={askQuestion}>
                 <input
                   type="text"
-                  placeholder={user ? 'Escribe tu pregunta… ¿Hace envíos a Matanzas?' : 'Inicia sesión para preguntar'}
+                  placeholder={user ? '¿Hace envíos a Matanzas? ¿Acepta Transfermóvil?' : 'Entra para hacer una pregunta'}
                   value={question}
                   maxLength={500}
                   onChange={(e) => setQuestion(e.target.value)}
@@ -342,28 +342,28 @@ export default function ListingDetail() {
               </form>
             )}
             {questions.length === 0 ? (
-              <p className="muted">Nadie ha preguntado todavía. ¡Sé el primero!</p>
+              <p className="muted">Nadie ha preguntado todavía.</p>
             ) : (
               <ul className="qa-list">
                 {questions.map((qq) => (
                   <li key={qq.id}>
                     <p className="qa-q">{qq.question} <small className="muted">· {formatDate(qq.created_at)}</small></p>
                     {qq.answer ? (
-                      <p className="qa-a">↳ {qq.answer} <small className="muted">· {qq.answered_at ? formatDate(qq.answered_at) : ''}</small></p>
+                      <p className="qa-a">{qq.answer} <small className="muted">· {qq.answered_at ? formatDate(qq.answered_at) : ''}</small></p>
                     ) : isOwner ? (
                       <div className="ask-form">
                         <input
                           type="text"
-                          placeholder="Responder…"
+                          placeholder="Escribe tu respuesta…"
                           value={answers[qq.id] ?? ''}
                           onChange={(e) => setAnswers((a) => ({ ...a, [qq.id]: e.target.value }))}
                         />
-                        <button type="button" className="btn btn-outline btn-sm" onClick={() => answerQuestion(qq.id)}>
+                        <button type="button" className="btn btn-light btn-sm" onClick={() => answerQuestion(qq.id)}>
                           Responder
                         </button>
                       </div>
                     ) : (
-                      <p className="qa-a muted">↳ Esperando respuesta del vendedor</p>
+                      <p className="qa-a muted">Esperando respuesta</p>
                     )}
                   </li>
                 ))}
@@ -371,10 +371,10 @@ export default function ListingDetail() {
             )}
           </section>
 
-          <section className="card">
-            <h2 className="card-h">Opiniones sobre el vendedor</h2>
+          <section className="panel">
+            <h2 className="panel-title">Opiniones del vendedor</h2>
             {reviews.length === 0 ? (
-              <p className="muted">Aún no hay reseñas para este vendedor.</p>
+              <p className="muted">Este vendedor aún no tiene opiniones.</p>
             ) : (
               <div className="review-list">
                 {reviews.slice(0, 5).map((r) => (
@@ -387,49 +387,40 @@ export default function ListingDetail() {
 
         <aside className="detail-side">
           {seller && (
-            <div className="card seller-card">
-              <h3 className="card-h">Información del vendedor</h3>
+            <div className="panel seller-card">
               <Link to={`/vendedor/${seller.id}`} className="seller-row">
                 <span className="avatar-lg">{(seller.username || 'V').slice(0, 2).toUpperCase()}</span>
-                <div>
-                  <div className="seller-name">{seller.username || 'Vendedor'}</div>
-                  <div className="muted small">{sellerSales} publicaciones · desde {formatDate(seller.created_at)}</div>
-                </div>
+                <span className="grow">
+                  <span className="seller-name">{seller.username || 'Vendedor'}</span>
+                  <span className="muted small">{sellerSales} anuncios · desde {formatDate(seller.created_at)}</span>
+                </span>
+                <ChevronRight size={18} className="muted" />
               </Link>
-              <div className="rep-bar">
-                {[1, 2, 3, 4, 5].map((n) => (
-                  <span key={n} className={`rep-seg rep-${n} ${avg >= n - 0.5 && reviews.length ? 'on' : ''}`} />
-                ))}
+              <div className="seller-rating">
+                <Stars value={avg} size="sm" />
+                <span>{reviews.length ? `${avg.toFixed(1)} · ${reviews.length} opinión${reviews.length === 1 ? '' : 'es'}` : 'Sin opiniones'}</span>
               </div>
               {wa && !isOwner && (
                 <a href={wa} target="_blank" rel="noreferrer" className="btn btn-whatsapp btn-block">
-                  WhatsApp al vendedor
+                  <MessageCircle size={17} /> Escribir por WhatsApp
                 </a>
               )}
               {listing.phone && !isOwner && (
-                <a href={`tel:${listing.phone}`} className="btn btn-outline btn-block">📞 {listing.phone}</a>
+                <a href={`tel:${listing.phone}`} className="btn btn-light btn-block"><Phone size={16} /> {listing.phone}</a>
               )}
             </div>
           )}
 
           {!isOwner && (
-            <div className="card">
-              <h3 className="card-h">Mensaje privado</h3>
+            <div className="panel">
+              <h3 className="panel-title">Mensaje al vendedor</h3>
               {user ? (
                 <form className="msg-form" onSubmit={sendMessage}>
-                  <textarea
-                    rows={3}
-                    placeholder="Hola, ¿sigue disponible?"
-                    value={body}
-                    onChange={(e) => setBody(e.target.value)}
-                    required
-                  />
-                  <button type="submit" className="btn btn-primary" disabled={busy}>
-                    Enviar mensaje
-                  </button>
+                  <textarea rows={3} placeholder="Hola, ¿todavía está disponible?" value={body} onChange={(e) => setBody(e.target.value)} required />
+                  <button type="submit" className="btn btn-primary" disabled={busy}>Enviar mensaje</button>
                 </form>
               ) : (
-                <Link to="/entrar" className="btn btn-primary btn-block">Inicia sesión para escribir</Link>
+                <Link to="/entrar" className="btn btn-primary btn-block">Entra para escribir</Link>
               )}
             </div>
           )}
@@ -438,8 +429,10 @@ export default function ListingDetail() {
 
       {related.length > 0 && (
         <section className="section">
-          <h2 className="section-title">Productos relacionados</h2>
-          <div className="listing-grid">
+          <div className="section-head">
+            <h2 className="section-title">También te puede interesar</h2>
+          </div>
+          <div className="card-grid">
             {related.map((l) => (
               <ListingCard key={l.id} listing={l} />
             ))}

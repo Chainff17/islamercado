@@ -33,6 +33,8 @@ export interface Listing {
   original_price: number | null
   free_shipping: boolean
   featured: boolean
+  made_in_cuba: boolean
+  price_period: string | null
   created_at: string
   updated_at: string
 }
@@ -129,4 +131,4 @@ export interface SellerSummary {
 }
 
 export const LISTING_SELECT =
-  'id, seller_id, category_id, title, description, price_usd, currency, negotiable, condition, province, city, images, phone, status, views, stock, original_price, free_shipping, featured, created_at, updated_at'
+  'id, seller_id, category_id, title, description, price_usd, currency, negotiable, condition, province, city, images, phone, status, views, stock, original_price, free_shipping, featured, made_in_cuba, price_period, created_at, updated_at'

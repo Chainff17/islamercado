@@ -8,9 +8,18 @@ const BUCKET = 'listing-images'
  * - Rutas locales del repo (/seed/..., /...) se devuelven tal cual (relativas)
  * - Resto: se asume path dentro del bucket de Supabase.
  */
-export function storageUrl(path: string): string {
+export function storageUrl(path: string, width?: number): string {
   if (!path) return ''
-  if (/^https?:\/\//i.test(path)) return path
+  if (/^https?:\/\//i.test(path)) {
+    // Imágenes de Unsplash: pedimos el tamaño justo (y más ligero en modo ahorro)
+    if (width && path.includes('images.unsplash.com')) {
+      const saver = typeof document !== 'undefined' && document.documentElement.classList.contains('ahorro')
+      const w = saver ? Math.min(width, 360) : width
+      const q = saver ? 40 : 75
+      return path.replace(/([?&])w=\d+/, `$1w=${w}`).replace(/([?&])q=\d+/, `$1q=${q}`)
+    }
+    return path
+  }
   // Rutas locales del repo: se resuelven contra la base de Vite (funciona en GitHub Pages)
   if (path.startsWith('/seed/')) return `${import.meta.env.BASE_URL}${path.slice(1)}`
   if (path.startsWith('./seed/')) return `${import.meta.env.BASE_URL}${path.slice(2)}`

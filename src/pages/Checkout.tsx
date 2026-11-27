@@ -5,8 +5,9 @@ import { LISTING_SELECT, type Listing } from '../lib/types'
 import { useAuth } from '../context/AuthContext'
 import { useCart } from '../context/CartContext'
 import { storageUrl } from '../lib/images'
-import { formatPrice } from '../lib/format'
-import { PAYMENT_METHODS, PROVINCES, convert, formatMoney } from '../lib/cuba'
+import { PAYMENT_METHODS, PROVINCES, asCurrency, formatMoney } from '../lib/cuba'
+import Price from '../components/Price'
+import { CreditCard, MapPin, ShieldCheck } from 'lucide-react'
 import { LoadingBlock, EmptyState, Alert } from '../components/Pagination'
 
 interface Line {
@@ -52,8 +53,12 @@ export default function Checkout() {
     return cart.items.filter((i) => i.listing).map((i) => ({ listing: i.listing!, quantity: i.quantity }))
   }, [itemId, direct, itemQty, cart.items])
 
-  const total = lines.reduce((a, l) => a + Number(l.listing.price_usd) * l.quantity, 0)
-  const sellers = new Set(lines.map((l) => l.listing.seller_id)).size
+  const totals: Record<string, number> = {}
+  for (const l of lines) {
+    const c = l.listing.currency || 'USD'
+    totals[c] = (totals[c] ?? 0) + Number(l.listing.price_usd) * l.quantity
+  }
+  const groups = new Set(lines.map((l) => `${l.listing.seller_id}|${l.listing.currency}`)).size
 
   function upd<K extends keyof typeof form>(k: K, v: string) {
     setForm((f) => ({ ...f, [k]: v }))
@@ -90,12 +95,12 @@ export default function Checkout() {
     return <EmptyState title="No hay nada que comprar" message="Agrega productos al carrito primero." action={<Link to="/buscar" className="btn btn-primary">Explorar</Link>} />
 
   return (
-    <div className="page checkout-page">
-      <h1>Finalizar compra</h1>
+    <div className="page">
+      <h1 className="page-title">Finalizar compra</h1>
       <form className="cart-layout" onSubmit={onSubmit}>
         <div className="checkout-main">
-          <section className="card">
-            <h2 className="card-h">1. ¿Dónde lo recibes?</h2>
+          <section className="panel form">
+            <h2 className="panel-title"><MapPin size={19} strokeWidth={1.7} /> ¿Dónde lo recibes?</h2>
             <div className="form-row">
               <label className="field"><span>Nombre de quien recibe *</span>
                 <input value={form.name} onChange={(e) => upd('name', e.target.value)} required />
@@ -122,8 +127,8 @@ export default function Checkout() {
             </label>
           </section>
 
-          <section className="card">
-            <h2 className="card-h">2. ¿Cómo pagas?</h2>
+          <section className="panel">
+            <h2 className="panel-title"><CreditCard size={19} strokeWidth={1.7} /> ¿Cómo pagas?</h2>
             <div className="pay-grid">
               {PAYMENT_METHODS.map((m) => (
                 <label key={m.id} className={`pay-option ${payment === m.id ? 'pay-on' : ''}`}>
@@ -138,25 +143,31 @@ export default function Checkout() {
           </section>
         </div>
 
-        <aside className="card cart-summary">
-          <h3 className="card-h">Resumen</h3>
+        <aside className="panel cart-summary">
+          <h3 className="panel-title">Resumen</h3>
           {lines.map((l) => (
             <div key={l.listing.id} className="sum-item">
-              {l.listing.images?.[0] && <img src={storageUrl(l.listing.images[0])} alt="" />}
+              {l.listing.images?.[0] && <img src={storageUrl(l.listing.images[0], 120)} alt="" />}
               <div>
                 <div className="small">{l.listing.title}</div>
-                <div className="muted small">{l.quantity} × {formatPrice(l.listing.price_usd, l.listing.currency)}</div>
+                <div className="muted small">{l.quantity} × <Price value={l.listing.price_usd} currency={l.listing.currency} period={l.listing.price_period} size="sm" /></div>
               </div>
             </div>
           ))}
-          <div className="sum-row sum-total"><span>Total</span><span>{formatPrice(total)}</span></div>
-          <div className="muted small">≈ {formatMoney(convert(total, 'USD', 'CUP'), 'CUP')}</div>
-          {sellers > 1 && <p className="muted small">Se crearán {sellers} pedidos (uno por vendedor).</p>}
+          <div className="sum-total">
+            <span>Total</span>
+            <span className="sum-amounts">
+              {Object.keys(totals).map((c) => (
+                <strong key={c}>{formatMoney(totals[c], asCurrency(c))}</strong>
+              ))}
+            </span>
+          </div>
+          {groups > 1 && <p className="hint">Se crearán {groups} pedidos (uno por vendedor y moneda).</p>}
           {error && <Alert kind="error">{error}</Alert>}
           <button type="submit" className="btn btn-primary btn-lg btn-block" disabled={saving}>
             {saving ? 'Procesando…' : 'Confirmar compra'}
           </button>
-          <p className="muted small">🛡️ Compra protegida: puedes cancelar mientras el pedido esté pendiente.</p>
+          <p className="hint inline-icons"><ShieldCheck size={14} /> Puedes cancelar mientras el pedido esté pendiente.</p>
         </aside>
       </form>
     </div>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { Phone } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import type { Listing, Profile, Review } from '../lib/types'
 import ListingCard from '../components/ListingCard'
@@ -26,7 +27,7 @@ export default function SellerProfile() {
       supabase
         .from('listings')
         .select(
-          'id, seller_id, category_id, title, description, price_usd, currency, negotiable, condition, province, city, images, phone, status, views, stock, original_price, free_shipping, featured, created_at, updated_at',
+          'id, seller_id, category_id, title, description, price_usd, currency, negotiable, condition, province, city, images, phone, status, views, stock, original_price, free_shipping, featured, made_in_cuba, price_period, created_at, updated_at',
         )
         .eq('seller_id', id)
         .eq('status', 'active')
@@ -79,7 +80,7 @@ export default function SellerProfile() {
             <span className="dot">·</span>
             <span>{listings.length} publicación(es)</span>
           </div>
-          {seller.phone && <p className="seller-phone">📞 {seller.phone}</p>}
+          {seller.phone && <p className="seller-phone"><Phone size={15} /> {seller.phone}</p>}
         </div>
       </div>
 

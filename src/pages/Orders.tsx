@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { CreditCard, House, ImageOff, MapPin, MessageCircle, Phone, Star, StickyNote, Store, User } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import type { Order, OrderItem } from '../lib/types'
 import { useAuth } from '../context/AuthContext'
@@ -77,7 +78,9 @@ export default function Orders({ mode }: { mode: Mode }) {
   if (!user) return <EmptyState title="Inicia sesión" action={<Link to="/entrar" className="btn btn-primary">Entrar</Link>} />
 
   const shown = filter ? orders.filter((o) => o.status === filter) : orders
-  const revenue = orders.filter((o) => o.status === 'delivered').reduce((a, o) => a + Number(o.total), 0)
+  const revenueBy: Record<string, number> = {}
+  for (const o of orders) if (o.status === 'delivered') revenueBy[o.currency] = (revenueBy[o.currency] ?? 0) + Number(o.total)
+  const revenue = Object.keys(revenueBy).length ? Object.entries(revenueBy).map(([c, v]) => formatPrice(v, c)).join(' · ') : formatPrice(0)
   const pending = orders.filter((o) => o.status === 'pending').length
 
   return (
@@ -88,13 +91,13 @@ export default function Orders({ mode }: { mode: Mode }) {
           <div className="stats-row">
             <div className="stat"><strong>{orders.length}</strong><span>Pedidos</span></div>
             <div className="stat"><strong>{pending}</strong><span>Por confirmar</span></div>
-            <div className="stat"><strong>{formatPrice(revenue)}</strong><span>Vendido (entregado)</span></div>
+            <div className="stat"><strong>{revenue}</strong><span>Vendido (entregado)</span></div>
           </div>
         )}
       </div>
 
       {params.get('nuevo') && !isSales && (
-        <Alert kind="success">🎉 ¡Compra realizada! El vendedor recibió tu pedido y un mensaje. Te contactará para coordinar pago y entrega.</Alert>
+        <Alert kind="success">¡Pedido enviado! El vendedor recibió tu pedido y un mensaje. Te contactará para coordinar pago y entrega.</Alert>
       )}
       {error && <Alert kind="error">{error}</Alert>}
 
@@ -130,23 +133,23 @@ export default function Orders({ mode }: { mode: Mode }) {
                 </div>
                 {o.items?.map((it) => (
                   <div key={it.id} className="order-item">
-                    {it.image ? <img src={storageUrl(it.image)} alt="" /> : <span className="order-noimg">📦</span>}
+                    {it.image ? <img src={storageUrl(it.image, 120)} alt="" /> : <span className="order-noimg"><ImageOff size={18} /></span>}
                     <div>
                       {it.listing_id ? <Link to={`/publicacion/${it.listing_id}`}>{it.title}</Link> : it.title}
-                      <div className="muted small">{it.quantity} × {formatPrice(it.price)}</div>
+                      <div className="muted small">{it.quantity} × {formatPrice(it.price, o.currency)}</div>
                     </div>
                   </div>
                 ))}
                 <div className="order-meta small">
-                  <span>{isSales ? '👤 Comprador' : '🏪 Vendedor'}: <Link to={`/vendedor/${otherId}`}>{names[otherId] ?? '…'}</Link></span>
-                  <span>💳 {paymentLabel(o.payment_method)}</span>
-                  <span>📍 {o.delivery_province}{o.delivery_city ? `, ${o.delivery_city}` : ''}</span>
-                  {isSales && <span>📞 {o.delivery_name} · {o.delivery_phone}</span>}
-                  {isSales && o.delivery_address && <span>🏠 {o.delivery_address}</span>}
-                  {o.notes && <span>📝 {o.notes}</span>}
+                  <span>{isSales ? <User size={14} /> : <Store size={14} />} {isSales ? 'Comprador' : 'Vendedor'}: <Link to={`/vendedor/${otherId}`}>{names[otherId] ?? '…'}</Link></span>
+                  <span><CreditCard size={14} /> {paymentLabel(o.payment_method)}</span>
+                  <span><MapPin size={14} /> {o.delivery_province}{o.delivery_city ? `, ${o.delivery_city}` : ''}</span>
+                  {isSales && <span><Phone size={14} /> {o.delivery_name} · {o.delivery_phone}</span>}
+                  {isSales && o.delivery_address && <span><House size={14} /> {o.delivery_address}</span>}
+                  {o.notes && <span><StickyNote size={14} /> {o.notes}</span>}
                 </div>
                 <div className="order-actions">
-                  {firstListing && <Link to={`/mensajes/${firstListing}`} className="btn btn-outline btn-sm">💬 Mensajes</Link>}
+                  {firstListing && <Link to={`/mensajes/${firstListing}`} className="btn btn-light btn-sm"><MessageCircle size={14} /> Mensajes</Link>}
                   {wa && <a href={wa} target="_blank" rel="noreferrer" className="btn btn-whatsapp btn-sm">WhatsApp</a>}
                   {isSales && o.status === 'pending' && <button type="button" className="btn btn-primary btn-sm" onClick={() => setStatus(o.id, 'confirmed')}>Confirmar</button>}
                   {isSales && o.status === 'confirmed' && <button type="button" className="btn btn-primary btn-sm" onClick={() => setStatus(o.id, 'shipped')}>Marcar enviado</button>}
@@ -156,7 +159,7 @@ export default function Orders({ mode }: { mode: Mode }) {
                     <button type="button" className="btn btn-ghost btn-sm text-danger" onClick={() => setStatus(o.id, 'cancelled')}>Cancelar</button>
                   )}
                   {!isSales && o.status === 'delivered' && !reviewed.has(o.seller_id) && (
-                    <button type="button" className="btn btn-soft btn-sm" onClick={() => setReviewFor(o.id)}>⭐ Calificar vendedor</button>
+                    <button type="button" className="btn btn-soft btn-sm" onClick={() => setReviewFor(o.id)}><Star size={14} /> Calificar vendedor</button>
                   )}
                 </div>
                 {reviewFor === o.id && (

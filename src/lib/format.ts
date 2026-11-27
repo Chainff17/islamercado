@@ -1,8 +1,8 @@
-import { convert, formatMoney, type Currency } from './cuba'
+import { asCurrency, convert, formatMoney, type Currency } from './cuba'
 
-export function formatPrice(value: number, currency: string = 'USD'): string {
-  const cur = (['USD', 'CUP', 'MLC'].includes(currency) ? currency : 'USD') as Currency
-  return formatMoney(Number(value), cur)
+export function formatPrice(value: number, currency: string = 'USD', period?: string | null): string {
+  const base = formatMoney(Number(value), asCurrency(currency))
+  return period ? `${base} / ${period}` : base
 }
 
 export function formatPriceConverted(value: number, from: string, to: Currency): string {
