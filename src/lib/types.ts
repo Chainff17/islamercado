@@ -20,6 +20,7 @@ export interface Listing {
   title: string
   description: string
   price_usd: number
+  currency: string
   negotiable: boolean
   condition: string
   province: string
@@ -28,6 +29,10 @@ export interface Listing {
   phone: string | null
   status: string
   views: number
+  stock: number
+  original_price: number | null
+  free_shipping: boolean
+  featured: boolean
   created_at: string
   updated_at: string
 }
@@ -58,9 +63,61 @@ export interface Favorite {
   created_at: string
 }
 
-export type ListingStatus = 'active' | 'sold' | 'reserved'
+export interface CartItem {
+  id: string
+  user_id: string
+  listing_id: string
+  quantity: number
+  created_at: string
+  listing?: Listing
+}
 
-export type SortKey = 'recientes' | 'mas-vistos' | 'precio-asc' | 'precio-desc'
+export interface Order {
+  id: string
+  buyer_id: string
+  seller_id: string
+  status: string
+  total: number
+  currency: string
+  payment_method: string
+  delivery_province: string | null
+  delivery_city: string | null
+  delivery_address: string | null
+  delivery_phone: string | null
+  delivery_name: string | null
+  notes: string | null
+  created_at: string
+  updated_at: string
+  items?: OrderItem[]
+  buyer_name?: string
+  seller_name?: string
+}
+
+export interface OrderItem {
+  id: string
+  order_id: string
+  listing_id: string | null
+  title: string
+  price: number
+  quantity: number
+  image: string | null
+  created_at: string
+}
+
+export interface Question {
+  id: string
+  listing_id: string
+  asker_id: string
+  question: string
+  answer: string | null
+  answered_at: string | null
+  created_at: string
+  asker_name?: string
+}
+
+export type ListingStatus = 'active' | 'sold' | 'reserved' | 'paused'
+
+export type SortKey = 'recientes' | 'mas-vistos' | 'precio-asc' | 'precio-desc' | 'relevancia'
 
 export interface SellerSummary {
   id: string
@@ -70,3 +127,6 @@ export interface SellerSummary {
   listing_count: number
   avg_rating: number | null
 }
+
+export const LISTING_SELECT =
+  'id, seller_id, category_id, title, description, price_usd, currency, negotiable, condition, province, city, images, phone, status, views, stock, original_price, free_shipping, featured, created_at, updated_at'

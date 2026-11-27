@@ -12,10 +12,12 @@ export default defineConfig({
   },
   server: {
     host: '0.0.0.0',
+    // Permite hosts de preview (e2b, túneles) además de localhost
+    allowedHosts: true,
   },
   preview: {
     host: '0.0.0.0',
-    // Permite los hosts de preview de la plataforma y el local
-    allow: ['4173-i1r45o4kvej8fdgsivgr8.e2b.app', 'localhost', '127.0.0.1'],
+    port: 4173,
+    allowedHosts: true,
   },
 })

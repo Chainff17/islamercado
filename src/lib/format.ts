@@ -1,8 +1,13 @@
-export function formatPrice(value: number): string {
-  return `$${Number(value).toLocaleString('es-CU', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`
+import { convert, formatMoney, type Currency } from './cuba'
+
+export function formatPrice(value: number, currency: string = 'USD'): string {
+  const cur = (['USD', 'CUP', 'MLC'].includes(currency) ? currency : 'USD') as Currency
+  return formatMoney(Number(value), cur)
+}
+
+export function formatPriceConverted(value: number, from: string, to: Currency): string {
+  const f = (['USD', 'CUP', 'MLC'].includes(from) ? from : 'USD') as Currency
+  return formatMoney(convert(Number(value), f, to), to)
 }
 
 export function formatDate(iso: string): string {
@@ -38,4 +43,20 @@ export function initials(name: string | null | undefined): string {
 export function ratingText(rating: number | null | undefined): string {
   if (rating === null || rating === undefined) return 'Sin reseñas'
   return `${rating.toFixed(1)} ⭐`
+}
+
+export function discountPct(price: number, original: number | null | undefined): number | null {
+  if (!original || original <= price) return null
+  return Math.round(((original - price) / original) * 100)
+}
+
+export function conditionLabel(c: string): string {
+  const map: Record<string, string> = {
+    nuevo: 'Nuevo',
+    como_nuevo: 'Como nuevo',
+    'like-new': 'Como nuevo',
+    usado: 'Usado',
+    mal: 'En mal estado',
+  }
+  return map[c] ?? c
 }

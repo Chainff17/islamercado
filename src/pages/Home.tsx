@@ -1,30 +1,32 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import type { Category, Listing } from '../lib/types'
+import { LISTING_SELECT, type Category, type Listing } from '../lib/types'
 import ListingCard from '../components/ListingCard'
 import { LoadingBlock, EmptyState } from '../components/Pagination'
+import { PROVINCES } from '../lib/cuba'
 
 export default function Home() {
   const [categories, setCategories] = useState<Category[]>([])
   const [topListings, setTopListings] = useState<Listing[]>([])
+  const [deals, setDeals] = useState<Listing[]>([])
+  const [recent, setRecent] = useState<Listing[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     let active = true
     async function load() {
-      const [cats, listings] = await Promise.all([
+      const [cats, top, deal, rec] = await Promise.all([
         supabase.from('categories').select('id, slug, name, icon').order('id'),
-        supabase
-          .from('listings')
-          .select('id, seller_id, category_id, title, description, price_usd, negotiable, condition, province, city, images, phone, status, views, created_at, updated_at')
-          .eq('status', 'active')
-          .order('views', { ascending: false })
-          .limit(8),
+        supabase.from('listings').select(LISTING_SELECT).eq('status', 'active').order('views', { ascending: false }).limit(8),
+        supabase.from('listings').select(LISTING_SELECT).eq('status', 'active').not('original_price', 'is', null).order('views', { ascending: false }).limit(8),
+        supabase.from('listings').select(LISTING_SELECT).eq('status', 'active').order('created_at', { ascending: false }).limit(8),
       ])
       if (!active) return
       if (cats.data) setCategories(cats.data)
-      if (listings.data) setTopListings(listings.data as Listing[])
+      if (top.data) setTopListings(top.data as Listing[])
+      if (deal.data) setDeals(deal.data as Listing[])
+      if (rec.data) setRecent(rec.data as Listing[])
       setLoading(false)
     }
     load()
@@ -35,22 +37,35 @@ export default function Home() {
 
   return (
     <div className="home">
-      <section className="hero">
+      <section className="hero hero-ml">
         <div className="hero-inner">
-          <h1>Tu mercado de segunda mano en Cuba</h1>
+          <span className="hero-kicker">🇨🇺 Hecho para Cuba · Compra protegida</span>
+          <h1>Compra y vende en toda Cuba, como en Mercado Libre</h1>
           <p>
-            Compra y vende artículos usados, conversa con vendedores y publica tus cosas
-            en un solo lugar.
+            Publica gratis, paga con Transfermóvil, Zelle o contra entrega y recibe en tu provincia.
+            Miles de artículos de segunda mano y nuevos, de La Habana a Guantánamo.
           </p>
           <div className="hero-actions">
             <Link to="/buscar" className="btn btn-primary btn-lg">
               Explorar artículos
             </Link>
-            <Link to="/publicar" className="btn btn-outline btn-lg">
-              Publicar un artículo
+            <Link to="/publicar" className="btn btn-dark btn-lg">
+              Vender ahora
             </Link>
           </div>
+          <div className="hero-stats">
+            <span>🚚 Envío a 16 provincias</span>
+            <span>💳 Transfermóvil · Zelle · MLC</span>
+            <span>🛡️ Compra protegida</span>
+          </div>
         </div>
+      </section>
+
+      <section className="benefits">
+        <div className="benefit"><span className="b-icon">🚚</span><div><strong>Envío a toda Cuba</strong><small>Entrega en 24–72 h según provincia</small></div></div>
+        <div className="benefit"><span className="b-icon">💵</span><div><strong>Pago contra entrega</strong><small>Pagas cuando recibes tu pedido</small></div></div>
+        <div className="benefit"><span className="b-icon">📱</span><div><strong>Transfermóvil y Zelle</strong><small>Sin tarjetas, sin complicaciones</small></div></div>
+        <div className="benefit"><span className="b-icon">⭐</span><div><strong>Vendedores calificados</strong><small>Reseñas reales de compradores</small></div></div>
       </section>
 
       <section className="section">
@@ -69,12 +84,24 @@ export default function Home() {
         )}
       </section>
 
+      {deals.length > 0 && (
+        <section className="section">
+          <div className="section-head">
+            <h2 className="section-title">⚡ Ofertas del día</h2>
+            <Link to="/buscar?ofertas=1" className="section-link">Ver todas →</Link>
+          </div>
+          <div className="listing-grid">
+            {deals.map((l) => (
+              <ListingCard key={l.id} listing={l} />
+            ))}
+          </div>
+        </section>
+      )}
+
       <section className="section">
         <div className="section-head">
-          <h2 className="section-title">Más visitados</h2>
-          <Link to="/buscar" className="section-link">
-            Ver todo →
-          </Link>
+          <h2 className="section-title">🔥 Más vendidos</h2>
+          <Link to="/buscar?sort=mas-vistos" className="section-link">Ver todo →</Link>
         </div>
         {loading ? (
           <LoadingBlock />
@@ -82,11 +109,7 @@ export default function Home() {
           <EmptyState
             title="Aún no hay publicaciones"
             message="Sé el primero en publicar un artículo en Isla Mercado."
-            action={
-              <Link to="/publicar" className="btn btn-primary">
-                Publicar
-              </Link>
-            }
+            action={<Link to="/publicar" className="btn btn-primary">Publicar</Link>}
           />
         ) : (
           <div className="listing-grid">
@@ -95,6 +118,39 @@ export default function Home() {
             ))}
           </div>
         )}
+      </section>
+
+      <section className="section">
+        <div className="section-head">
+          <h2 className="section-title">🆕 Recién publicados</h2>
+          <Link to="/buscar?sort=recientes" className="section-link">Ver todo →</Link>
+        </div>
+        {loading ? (
+          <LoadingBlock />
+        ) : (
+          <div className="listing-grid">
+            {recent.map((l) => (
+              <ListingCard key={l.id} listing={l} />
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="section">
+        <h2 className="section-title">📍 Compra por provincia</h2>
+        <div className="province-grid">
+          {PROVINCES.map((p) => (
+            <Link key={p} to={`/buscar?provincia=${encodeURIComponent(p)}`} className="province-chip">
+              📍 {p}
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      <section className="cta-band">
+        <h2>¿Tienes algo para vender?</h2>
+        <p>Publica en 2 minutos, sin comisión el primer mes. Tu artículo llega a miles de cubanos.</p>
+        <Link to="/publicar" className="btn btn-primary btn-lg">Publicar gratis</Link>
       </section>
     </div>
   )

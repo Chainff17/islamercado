@@ -3,18 +3,25 @@
 **Isla Mercado** — marketplace cubano para publicar y buscar artículos usados, con
 chat entre comprador y vendedor, favoritos y reseñas.
 
-## Funcionalidades
+## Funcionalidades (estilo Mercado Libre, hecho para Cuba 🇨🇺)
 
-- **Home**: hero, acceso rápido por categorías y publicaciones más visitadas.
-- **Búsqueda y filtros**: por categoría, texto (`?q=`) y orden (recientes, más vistos, precio).
-- **Detalle de publicación**: galería de imágenes, datos del vendedor, contactar por mensaje,
-  marcar como favorito y ver reseñas.
-- **Mensajes**: conversación por publicación, lista agrupada, marcar como leída.
-- **Vendedor**: perfil con su promedio de reseñas y sus publicaciones.
-- **Publicar artículo**: formulario completo con subida de imágenes al bucket `listing-images`.
-- **Auth**: registro e ingreso con email (Supabase Auth), perfil editable (usuario/teléfono).
-- **Favoritos**: guarda las publicaciones que más te gusten.
-- Responsive, en español, con imágenes de ejemplo incluidas.
+- **Home**: hero, beneficios (envío a toda Cuba, pago contra entrega, Transfermóvil/Zelle),
+  categorías, *Ofertas del día*, *Más vendidos*, *Recién publicados* y compra por provincia.
+- **Búsqueda y filtros**: texto (título + descripción), categoría, **16 provincias**, condición,
+  rango de precio, solo ofertas, orden y paginación.
+- **Ficha de producto**: galería, precio con descuento y equivalencia en **CUP/MLC**, stock,
+  selector de cantidad, **Comprar ahora**, **Agregar al carrito**, envío gratis,
+  **Preguntas y respuestas**, reputación del vendedor, WhatsApp (+53), relacionados.
+- **Carrito** persistente en Supabase (por usuario) con control de stock.
+- **Checkout**: datos de entrega (provincia/municipio/dirección), métodos de pago cubanos
+  (Transfermóvil, Zelle, efectivo CUP/USD/MLC, contra entrega). Se crea **un pedido por vendedor**,
+  se descuenta stock y se notifica al vendedor por mensaje (RPC `place_order`).
+- **Mis compras / Mis ventas**: estados *Pendiente → Confirmado → En camino → Entregado* o
+  *Cancelado* (restaura stock), contacto por WhatsApp y calificación del vendedor al recibir.
+- **Mis publicaciones**: editar, pausar, reactivar, marcar vendida, eliminar.
+- **Publicar**: moneda (USD/CUP/MLC), precio anterior (oferta), stock, envío gratis y hasta 8 fotos.
+- **Mensajes**, **Favoritos**, **perfil de vendedor**, **Auth** por email.
+- Responsive, en español, `HashRouter` para que las rutas profundas funcionen en GitHub Pages.
 
 ## Stack
 
@@ -73,7 +80,11 @@ La configuración oficial de Supabase de **este repositorio** (islamercado) est�
 ### Tablas principales
 
 - `categories`, `listings`, `profiles`, `reviews`, `messages`, `favorites`
-- Todas con **RLS** activa.
+- `cart_items`, `orders`, `order_items`, `questions` (marketplace estilo Mercado Libre)
+- Todas con **RLS** activa. Los pedidos solo se crean/modifican vía RPC `SECURITY DEFINER`.
+- **RPC**: `place_order(...)` (checkout atómico: valida stock, crea pedidos por vendedor,
+  descuenta stock, notifica y vacía el carrito) y `update_order_status(p_order, p_status)`.
+- Migraciones SQL versionadas en `supabase/migrations/`.
 - **Storage**: bucket público `listing-images` (lectura abierta; subida/borrado restringidos
   al folder del usuario autenticado).
 - **RPC**: `increment_listing_views(p_id uuid)` — incrementa `listings.views` al entrar a

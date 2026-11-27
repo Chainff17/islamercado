@@ -123,6 +123,18 @@ export default function Profile() {
           <Link to="/publicar" className="profile-link">
             <span className="pl-icon">📝</span> Publicar un artículo
           </Link>
+          <Link to="/mis-publicaciones" className="profile-link">
+            <span className="pl-icon">📋</span> Mis publicaciones
+          </Link>
+          <Link to="/mis-compras" className="profile-link">
+            <span className="pl-icon">🛍️</span> Mis compras
+          </Link>
+          <Link to="/mis-ventas" className="profile-link">
+            <span className="pl-icon">💰</span> Mis ventas
+          </Link>
+          <Link to="/carrito" className="profile-link">
+            <span className="pl-icon">🛒</span> Mi carrito
+          </Link>
           <Link to="/mensajes" className="profile-link">
             <span className="pl-icon">💬</span> Mis mensajes
           </Link>
