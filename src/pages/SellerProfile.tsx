@@ -26,7 +26,7 @@ export default function SellerProfile() {
       supabase
         .from('listings')
         .select(
-          'id, seller_id, category_id, title, description, price_usd, negotiable, condition, province, city, images, phone, status, views, created_at, updated_at',
+          'id, seller_id, category_id, title, description, price_usd, currency, negotiable, condition, province, city, images, phone, status, views, stock, original_price, free_shipping, featured, created_at, updated_at',
         )
         .eq('seller_id', id)
         .eq('status', 'active')

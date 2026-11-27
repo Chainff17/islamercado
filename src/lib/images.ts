@@ -3,23 +3,23 @@ import { supabase } from './supabase'
 const BUCKET = 'listing-images'
 
 /**
- * Devuelve la URL pública de una imagen del bucket de Supabase.
- * Si ya es una URL absoluta (http/https) la devuelve tal cual.
+ * Devuelve la URL pública de una imagen.
+ * - URLs absolutas (http/https) se devuelven tal cual (Unsplash, etc.)
+ * - Rutas locales del repo (/seed/..., /...) se devuelven tal cual (relativas)
+ * - Resto: se asume path dentro del bucket de Supabase.
  */
 export function storageUrl(path: string): string {
+  if (!path) return ''
   if (/^https?:\/\//i.test(path)) return path
+  // Rutas locales del repo: se resuelven contra la base de Vite (funciona en GitHub Pages)
+  if (path.startsWith('/seed/')) return `${import.meta.env.BASE_URL}${path.slice(1)}`
+  if (path.startsWith('./seed/')) return `${import.meta.env.BASE_URL}${path.slice(2)}`
+  if (path.startsWith('/')) return path
   const clean = path.replace(/^\/+/, '')
   return `${supabase.storage.from(BUCKET).getPublicUrl(clean).data.publicUrl}`
 }
 
-/**
- * Carga una imagen subida localmente al bucket y devuelve la ruta
- * almacenada en la tabla (el path dentro del bucket).
- */
-export async function uploadImage(
-  file: File,
-  ownerId: string,
-): Promise<string> {
+export async function uploadImage(file: File, ownerId: string): Promise<string> {
   const safeName = `${Date.now()}-${file.name.replace(/\s+/g, '-')}`
   const path = `${ownerId}/${safeName}`
   const { error } = await supabase.storage.from(BUCKET).upload(path, file, {
