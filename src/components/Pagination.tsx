@@ -1,30 +1,26 @@
-import { useEffect, useState } from 'react'
+import { useState, type ReactNode } from 'react'
 
-/** Indicador de carga en bloque. */
 export function LoadingBlock({ message = 'Cargando…' }: { message?: string }) {
   return (
-    <div className="state-block">
+    <div className="state-block loading-block">
       <div className="spinner" />
       <p>{message}</p>
     </div>
   )
 }
 
-/** Estado vacío con mensaje y llamada a la acción. */
 export function EmptyState({
-  icon = '🔍',
   title,
   message,
   action,
 }: {
-  icon?: string
   title: string
   message?: string
-  action?: React.ReactNode
+  action?: ReactNode
 }) {
   return (
-    <div className="state-block">
-      <div className="state-icon">{icon}</div>
+    <div className="state-block empty-state">
+      <div className="empty-icon">📭</div>
       <h3>{title}</h3>
       {message && <p>{message}</p>}
       {action}
@@ -32,14 +28,21 @@ export function EmptyState({
   )
 }
 
-/** Alerta de error/exito en bloque. */
-export function Alert({ kind, children }: { kind: 'error' | 'success'; children: React.ReactNode }) {
+export function Alert({
+  kind = 'error',
+  children,
+}: {
+  kind?: 'error' | 'success' | 'info'
+  children: ReactNode
+}) {
   return <div className={`alert alert-${kind}`}>{children}</div>
 }
 
-/** Hook pequeño para re-render tras cambios externos (p. ej. navigation). */
+/** Hook para evitar renderizados previos al montaje (evita warnings de React Router). */
 export function useMounted() {
-  const [mounted, setMounted] = useState(false)
-  useEffect(() => setMounted(true), [])
+  const [mounted, setMounted] = useState(true)
+  if (!mounted) {
+    setMounted(true)
+  }
   return mounted
 }

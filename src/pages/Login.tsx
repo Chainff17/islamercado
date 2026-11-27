@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { Alert } from '../components/Pagination'
@@ -8,61 +8,61 @@ export default function Login() {
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
-  const submit = async (e: React.FormEvent) => {
+  async function onSubmit(e: FormEvent) {
     e.preventDefault()
-    setError(null)
-    setSubmitting(true)
-    const { error: err } = await signIn(email, password)
-    setSubmitting(false)
-    if (err) {
-      setError(err)
-      return
+    setError('')
+    setLoading(true)
+    try {
+      await signIn(email.trim(), password)
+      navigate('/')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo iniciar sesión.')
+    } finally {
+      setLoading(false)
     }
-    navigate('/')
   }
 
   return (
-    <div className="auth-page">
-      <div className="auth-card">
-        <h1>Ingresar</h1>
-        <p className="muted">Accede a tu cuenta de Isla Mercado.</p>
+    <div className="auth-wrap">
+      <form className="auth-card" onSubmit={onSubmit}>
+        <h1>Iniciar sesión</h1>
+        <p className="auth-sub">Accede a tus publicaciones, mensajes y favoritos.</p>
+
+        <label className="field">
+          <span>Correo electrónico</span>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="tu@correo.com"
+            required
+          />
+        </label>
+
+        <label className="field">
+          <span>Contraseña</span>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="••••••••"
+            required
+          />
+        </label>
+
         {error && <Alert kind="error">{error}</Alert>}
-        <form className="form" onSubmit={submit}>
-          <div className="field">
-            <label htmlFor="email">Correo</label>
-            <input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="tú@correo.com"
-              required
-              autoComplete="email"
-            />
-          </div>
-          <div className="field">
-            <label htmlFor="password">Contraseña</label>
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              required
-              autoComplete="current-password"
-            />
-          </div>
-          <button type="submit" className="btn btn-primary btn-lg" disabled={submitting}>
-            {submitting ? 'Ingresando…' : 'Ingresar'}
-          </button>
-        </form>
+
+        <button type="submit" className="btn btn-primary btn-block btn-lg" disabled={loading}>
+          {loading ? 'Ingresando…' : 'Iniciar sesión'}
+        </button>
+
         <p className="auth-foot">
           ¿No tienes cuenta? <Link to="/registro">Regístrate aquí</Link>
         </p>
-      </div>
+      </form>
     </div>
   )
 }

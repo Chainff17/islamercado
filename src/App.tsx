@@ -1,5 +1,5 @@
-import { Link, Route, Routes, useLocation } from 'react-router-dom'
 import { useEffect } from 'react'
+import { Routes, Route, useLocation } from 'react-router-dom'
 import Header from './components/Header'
 import Home from './pages/Home'
 import Browse from './pages/Browse'
@@ -23,10 +23,10 @@ function ScrollToTop() {
 
 export default function App() {
   return (
-    <div className="app">
+    <div className="app-shell">
       <ScrollToTop />
       <Header />
-      <main className="container main">
+      <main className="main-content">
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/buscar" element={<Browse />} />
@@ -43,24 +43,10 @@ export default function App() {
           <Route path="*" element={<NotFound />} />
         </Routes>
       </main>
-      <footer className="footer">
-        <div className="container">
-          <div className="footer-inner">
-            <div>
-              <div className="footer-brand">🏝️ Isla Mercado</div>
-              <p>El mercado de segunda mano de Cuba. Compra, vende y conversa con vendedores de todo el país.</p>
-            </div>
-            <div className="footer-links">
-              <Link to="/">Inicio</Link>
-              <Link to="/buscar">Buscar</Link>
-              <Link to="/publicar">Publicar</Link>
-              <Link to="/mensajes">Mensajes</Link>
-              <Link to="/favoritos">Favoritos</Link>
-            </div>
-          </div>
-          <div className="footer-copy">
-            © {new Date().getFullYear()} Isla Mercado · Hecho en Cuba 🇨🇺
-          </div>
+      <footer className="app-footer">
+        <div className="footer-inner">
+          <span>Isla Mercado · Mercado de segunda mano en Cuba</span>
+          <span className="footer-note">Hecho con ❤️ para el mercado cubano</span>
         </div>
       </footer>
     </div>

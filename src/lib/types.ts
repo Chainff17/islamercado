@@ -19,7 +19,7 @@ export interface Listing {
   category_id: number
   title: string
   description: string
-  price_usd: number | string
+  price_usd: number
   negotiable: boolean
   condition: string
   province: string
@@ -52,18 +52,21 @@ export interface Message {
   created_at: string
 }
 
-export interface ListingWithRelations extends Listing {
-  category: Category | null
-  seller: Profile | null
+export interface Favorite {
+  user_id: string
+  listing_id: string
+  created_at: string
 }
 
-export const CONDITIONS: Record<string, string> = {
-  nuevo: 'Nuevo',
-  usado: 'Usado',
-  como_nuevo: 'Como nuevo',
-  defectuoso: 'Con defectos',
-}
+export type ListingStatus = 'active' | 'sold' | 'reserved'
 
-export function conditionLabel(condition: string): string {
-  return CONDITIONS[condition] ?? condition
+export type SortKey = 'recientes' | 'mas-vistos' | 'precio-asc' | 'precio-desc'
+
+export interface SellerSummary {
+  id: string
+  username: string | null
+  phone: string | null
+  avatar_url: string | null
+  listing_count: number
+  avg_rating: number | null
 }

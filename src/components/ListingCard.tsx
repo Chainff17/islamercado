@@ -1,34 +1,37 @@
 import { Link } from 'react-router-dom'
-import type { ListingWithRelations } from '../lib/types'
-import { conditionLabel } from '../lib/types'
-import { formatPrice, formatNumber, timeAgo } from '../lib/format'
-import { imageUrl } from '../lib/images'
+import type { Listing } from '../lib/types'
+import { storageUrl } from '../lib/images'
+import { formatPrice, timeAgo } from '../lib/format'
 
-export default function ListingCard({ listing }: { listing: ListingWithRelations }) {
-  const cover = listing.images?.[0] ?? ''
+interface Props {
+  listing: Listing
+}
+
+export default function ListingCard({ listing }: Props) {
+  const cover = listing.images?.[0] ? storageUrl(listing.images[0]) : ''
+
   return (
-    <Link to={`/publicacion/${listing.id}`} className="card listing-card">
-      <div className="card-media">
+    <Link to={`/publicacion/${listing.id}`} className="listing-card">
+      <div className="card-cover">
         {cover ? (
-          <img src={imageUrl(cover)} alt={listing.title} loading="lazy" />
+          <img src={cover} alt={listing.title} loading="lazy" />
         ) : (
-          <div className="card-placeholder">🏷️</div>
+          <div className="card-cover-empty">📦</div>
         )}
-        <span className={`badge badge-condition badge-${listing.condition}`}>
-          {conditionLabel(listing.condition)}
-        </span>
-        {listing.negotiable && <span className="badge badge-negotiable">Negociable</span>}
+        <div className="card-badges">
+          {listing.condition && <span className="badge badge-condition">{listing.condition}</span>}
+          {listing.negotiable && <span className="badge badge-negotiable">Negociable</span>}
+        </div>
       </div>
+
       <div className="card-body">
         <h3 className="card-title">{listing.title}</h3>
         <div className="card-price">{formatPrice(listing.price_usd)}</div>
         <div className="card-meta">
-          <span>📍 {listing.province}{listing.city ? ` · ${listing.city}` : ''}</span>
+          <span className="card-location">📍 {listing.province}{listing.city ? `, ${listing.city}` : ''}</span>
+          <span className="card-views">👁 {listing.views ?? 0}</span>
         </div>
-        <div className="card-meta card-meta-muted">
-          <span>{formatNumber(listing.views)} vistas</span>
-          <span>· {timeAgo(listing.created_at)}</span>
-        </div>
+        <div className="card-time">{timeAgo(listing.created_at)}</div>
       </div>
     </Link>
   )

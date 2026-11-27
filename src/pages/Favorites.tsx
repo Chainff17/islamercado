@@ -1,15 +1,14 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { useAuth } from '../context/AuthContext'
-import type { ListingWithRelations } from '../lib/types'
+import type { Listing } from '../lib/types'
 import ListingCard from '../components/ListingCard'
-import { EmptyState, LoadingBlock } from '../components/Pagination'
+import { LoadingBlock, EmptyState } from '../components/Pagination'
+import { useAuth } from '../context/AuthContext'
 
 export default function Favorites() {
-  const { user, loading: authLoading } = useAuth()
-  const navigate = useNavigate()
-  const [listings, setListings] = useState<ListingWithRelations[]>([])
+  const { user } = useAuth()
+  const [listings, setListings] = useState<Listing[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -17,63 +16,56 @@ export default function Favorites() {
       setLoading(false)
       return
     }
-    (async () => {
-      const { data, error } = await supabase
-        .from('favorites')
-        .select('listing_id')
-        .eq('user_id', user.id)
-      if (error) {
-        console.error(error)
+    let active = true
+    setLoading(true)
+    supabase
+      .from('favorites')
+      .select('listing_id, listings ( id, seller_id, category_id, title, description, price_usd, negotiable, condition, province, city, images, phone, status, views, created_at, updated_at )')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .then(({ data }) => {
+        if (!active) return
+        const rows = (data ?? []) as unknown as Array<{
+          listing_id: string
+          listings: Listing | null
+        }>
+        const favs = rows
+          .map((r) => r.listings)
+          .filter((l): l is Listing => !!l)
+        setListings(favs)
         setLoading(false)
-        return
-      }
-      const ids = (data as { listing_id: string }[]).map((f) => f.listing_id)
-      if (ids.length === 0) {
-        setListings([])
-        setLoading(false)
-        return
-      }
-      const { data: ls } = await supabase
-        .from('listings')
-        .select(
-          'id, seller_id, category_id, title, description, price_usd, negotiable, condition, province, city, images, phone, status, views, created_at, updated_at, category:categories(id,slug,name,icon), seller:profiles(id,username,phone,avatar_url)'
-        )
-        .in('id', ids)
-      setListings((ls as unknown as ListingWithRelations[]) ?? [])
-      setLoading(false)
-    })()
+      })
+    return () => {
+      active = false
+    }
   }, [user])
 
-  if (authLoading) return <LoadingBlock />
-  if (!user) {
+  if (loading) return <LoadingBlock />
+
+  if (!user)
     return (
       <EmptyState
-        icon="🔐"
         title="Inicia sesión para ver tus favoritos"
         action={
-          <button className="btn btn-primary" onClick={() => navigate('/entrar')}>
-            Ingresar
-          </button>
+          <Link to="/entrar" className="btn btn-primary">
+            Entrar
+          </Link>
         }
       />
     )
-  }
-  if (loading) return <LoadingBlock />
 
   return (
-    <div className="favorites">
-      <div className="section-head">
-        <h2>Mis favoritos</h2>
-        <span className="result-count">{listings.length} artículos</span>
+    <div className="page">
+      <div className="page-head">
+        <h1>Mis favoritos</h1>
       </div>
       {listings.length === 0 ? (
         <EmptyState
-          icon="🤍"
           title="Aún no tienes favoritos"
-          message="Explora las publicaciones y agregua tus favoritos para encontrarlas aquí."
+          message="Guarda los artículos que te gusten para encontrarlos aquí."
           action={
             <Link to="/buscar" className="btn btn-primary">
-              Explorar publicaciones
+              Explorar artículos
             </Link>
           }
         />

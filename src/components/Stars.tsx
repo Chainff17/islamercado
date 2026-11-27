@@ -1,40 +1,51 @@
-import type { Review } from '../lib/types'
+import { useState } from 'react'
 
-export default function Stars({
-  value,
-  size = 'md',
-  onChange,
-}: {
+interface StarsProps {
   value: number
-  size?: 'sm' | 'md'
   onChange?: (v: number) => void
-}) {
+  size?: 'sm' | 'md'
+}
+
+export function Stars({ value, onChange, size = 'md' }: StarsProps) {
+  const [hover, setHover] = useState(0)
+  const interactive = typeof onChange === 'function'
+  const shown = hover || value
+
   return (
-    <span className={`stars stars-${size}`} aria-label={`${value} de 5 estrellas`}>
-      {[1, 2, 3, 4, 5].map((n) => (
-        <button
-          key={n}
-          type="button"
-          className={`star ${n <= value ? 'star-on' : ''}`}
-          disabled={!onChange}
-          onClick={() => onChange?.(n)}
-          aria-label={`${n} estrellas`}
+    <span className={`stars stars-${size}`} role="img" aria-label={`${value} de 5 estrellas`}>
+      {[1, 2, 3, 4, 5].map((i) => (
+        <span
+          key={i}
+          className={`star ${i <= shown ? 'star-on' : 'star-off'}`}
+          onMouseEnter={() => interactive && setHover(i)}
+          onMouseLeave={() => interactive && setHover(0)}
+          onClick={() => interactive && onChange?.(i)}
+          role={interactive ? 'button' : undefined}
+          aria-hidden={interactive ? undefined : true}
         >
           ★
-        </button>
+        </span>
       ))}
     </span>
   )
 }
 
-export function ReviewItem({ review }: { review: Review }) {
+interface ReviewItemProps {
+  rating: number
+  comment: string
+  createdAt: string
+  authorName?: string
+}
+
+export function ReviewItem({ rating, comment, createdAt, authorName }: ReviewItemProps) {
   return (
     <div className="review-item">
       <div className="review-head">
-        <Stars value={review.rating} size="sm" />
-        <span className="review-date">{new Date(review.created_at).toLocaleDateString('es-CU')}</span>
+        <Stars value={rating} size="sm" />
+        {authorName && <span className="review-author">{authorName}</span>}
+        <span className="review-date">{new Date(createdAt).toLocaleDateString('es-CU')}</span>
       </div>
-      <p className="review-text">{review.comment}</p>
+      {comment && <p className="review-comment">{comment}</p>}
     </div>
   )
 }

@@ -1,97 +1,135 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useState, type FormEvent } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
-import { Alert, EmptyState, LoadingBlock } from '../components/Pagination'
+import { initials } from '../lib/format'
+import { LoadingBlock, EmptyState, Alert } from '../components/Pagination'
 
 export default function Profile() {
-  const { user, loading, updateProfile, signOut } = useAuth()
+  const { user, profile, loading, updateProfile, signOut } = useAuth()
   const navigate = useNavigate()
-  const [username, setUsername] = useState(user?.username ?? '')
-  const [phone, setPhone] = useState(user?.phone ?? '')
-  const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<string | null>(null)
+  const [form, setForm] = useState({ username: '', phone: '' })
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [counts, setCounts] = useState<{ listings: number; favorites: number } | null>(null)
+
+  useEffect(() => {
+    if (profile) {
+      setForm({ username: profile.username ?? '', phone: profile.phone ?? '' })
+    }
+  }, [profile])
+
+  useEffect(() => {
+    if (!user) return
+    Promise.all([
+      supabase.from('listings').select('id').eq('seller_id', user.id).eq('status', 'active'),
+      supabase.from('favorites').select('listing_id').eq('user_id', user.id),
+    ]).then(([l, f]) => {
+      setCounts({ listings: (l.data ?? []).length, favorites: (f.data ?? []).length })
+    })
+  }, [user])
 
   if (loading) return <LoadingBlock />
-  if (!user) {
+
+  if (!user)
     return (
       <EmptyState
-        icon="🔐"
         title="Inicia sesión para ver tu perfil"
         action={
-          <button className="btn btn-primary" onClick={() => navigate('/entrar')}>
-            Ingresar
-          </button>
+          <Link to="/entrar" className="btn btn-primary">
+            Entrar
+          </Link>
         }
       />
     )
+
+  async function onSubmit(e: FormEvent) {
+    e.preventDefault()
+    setError('')
+    setSaving(true)
+    try {
+      await updateProfile({
+        username: form.username.trim() || null,
+        phone: form.phone.trim() || null,
+      })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo actualizar.')
+    } finally {
+      setSaving(false)
+    }
   }
 
-  const save = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError(null)
-    setSuccess(null)
-    setSaving(true)
-    const { error: err } = await updateProfile({ username: username.trim(), phone: phone.trim() })
-    setSaving(false)
-    if (err) {
-      setError(err)
-      return
-    }
-    setSuccess('Perfil actualizado correctamente.')
+  async function onLogout() {
+    await signOut().catch(() => {})
+    navigate('/')
   }
 
   return (
-    <div className="form-page">
-      <div className="section-head">
-        <h2>Mi perfil</h2>
+    <div className="page profile">
+      <div className="page-head">
+        <h1>Mi perfil</h1>
       </div>
-      {error && <Alert kind="error">{error}</Alert>}
-      {success && <Alert kind="success">{success}</Alert>}
 
-      <div className="profile-card">
-        <div className="profile-avatar-wrap">
-          <span className="avatar avatar-xl">{user.username?.charAt(0).toUpperCase() ?? '👤'}</span>
-        </div>
-        <form className="form" onSubmit={save}>
-          <div className="form-grid">
-            <div className="field">
-              <label htmlFor="p-username">Nombre de usuario</label>
-              <input
-                id="p-username"
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="maria_habana"
-              />
-            </div>
-            <div className="field">
-              <label htmlFor="p-phone">Teléfono</label>
-              <input
-                id="p-phone"
-                type="tel"
-                value={phone ?? ''}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="5351234567"
-              />
+      <div className="profile-grid">
+        <form className="form card" onSubmit={onSubmit}>
+          <div className="profile-summary">
+            <span className="avatar-xl">{initials(profile?.username || user.email)}</span>
+            <div>
+              <div className="profile-email">{user.email}</div>
+              {counts && (
+                <div className="profile-counts">
+                  <span>{counts.listings} publicaciones</span>
+                  <span className="dot">·</span>
+                  <span>{counts.favorites} favoritos</span>
+                </div>
+              )}
             </div>
           </div>
+
+          <label className="field">
+            <span>Nombre de usuario</span>
+            <input
+              type="text"
+              value={form.username}
+              onChange={(e) => setForm((p) => ({ ...p, username: e.target.value }))}
+              placeholder="Tu nombre público"
+            />
+          </label>
+
+          <label className="field">
+            <span>Teléfono</span>
+            <input
+              type="tel"
+              value={form.phone}
+              onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))}
+              placeholder="+53 7 xxx xxxx"
+            />
+          </label>
+
+          {error && <Alert kind="error">{error}</Alert>}
+
           <div className="form-actions">
             <button type="submit" className="btn btn-primary" disabled={saving}>
               {saving ? 'Guardando…' : 'Guardar cambios'}
             </button>
-            <button
-              type="button"
-              className="btn btn-outline"
-              onClick={async () => {
-                await signOut()
-                navigate('/')
-              }}
-            >
-              Salir de la cuenta
+            <button type="button" className="btn btn-ghost" onClick={onLogout}>
+              Cerrar sesión
             </button>
           </div>
         </form>
+
+        <div className="profile-links card">
+          <h3 className="card-h">Mis zonas</h3>
+          <Link to="/publicar" className="profile-link">
+            <span className="pl-icon">📝</span> Publicar un artículo
+          </Link>
+          <Link to="/mensajes" className="profile-link">
+            <span className="pl-icon">💬</span> Mis mensajes
+          </Link>
+          <Link to="/favoritos" className="profile-link">
+            <span className="pl-icon">⭐</span> Mis favoritos
+          </Link>
+        </div>
       </div>
     </div>
   )

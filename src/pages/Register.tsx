@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { Alert } from '../components/Pagination'
@@ -6,83 +6,91 @@ import { Alert } from '../components/Pagination'
 export default function Register() {
   const { signUp } = useAuth()
   const navigate = useNavigate()
-  const [email, setEmail] = useState('')
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<string | null>(null)
-  const [submitting, setSubmitting] = useState(false)
+  const [form, setForm] = useState({ username: '', email: '', password: '', confirm: '' })
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
-  const submit = async (e: React.FormEvent) => {
+  function update<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
+    setForm((prev) => ({ ...prev, [key]: value }))
+  }
+
+  async function onSubmit(e: FormEvent) {
     e.preventDefault()
-    setError(null)
-    setSuccess(null)
-    if (password.length < 6) {
-      setError('La contraseña debe tener al menos 6 caracteres.')
-      return
+    setError('')
+    if (form.password.length < 6) return setError('La contraseña debe tener al menos 6 caracteres.')
+    if (form.password !== form.confirm) return setError('Las contraseñas no coinciden.')
+
+    setLoading(true)
+    try {
+      await signUp(form.email.trim(), form.password, form.username.trim() || form.email.split('@')[0])
+      navigate('/')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo registrar.')
+    } finally {
+      setLoading(false)
     }
-    setSubmitting(true)
-    const { error: err } = await signUp(email, password, { username: username || undefined })
-    setSubmitting(false)
-    if (err) {
-      setError(err)
-      return
-    }
-    setSuccess('Cuenta creada. Ya puedes ingresar con tu correo y contraseña.')
-    setTimeout(() => navigate('/entrar'), 1500)
   }
 
   return (
-    <div className="auth-page">
-      <div className="auth-card">
+    <div className="auth-wrap">
+      <form className="auth-card" onSubmit={onSubmit}>
         <h1>Crear cuenta</h1>
-        <p className="muted">Regístrate para comprar, vender y conversar en Isla Mercado.</p>
+        <p className="auth-sub">Regístrate para publicar y contactar con vendedores.</p>
+
+        <label className="field">
+          <span>Nombre de usuario</span>
+          <input
+            type="text"
+            value={form.username}
+            onChange={(e) => update('username', e.target.value)}
+            placeholder="mario"
+            required
+          />
+        </label>
+
+        <label className="field">
+          <span>Correo electrónico</span>
+          <input
+            type="email"
+            value={form.email}
+            onChange={(e) => update('email', e.target.value)}
+            placeholder="tu@correo.com"
+            required
+          />
+        </label>
+
+        <label className="field">
+          <span>Contraseña</span>
+          <input
+            type="password"
+            value={form.password}
+            onChange={(e) => update('password', e.target.value)}
+            placeholder="Mínimo 6 caracteres"
+            required
+          />
+        </label>
+
+        <label className="field">
+          <span>Confirmar contraseña</span>
+          <input
+            type="password"
+            value={form.confirm}
+            onChange={(e) => update('confirm', e.target.value)}
+            placeholder="••••••••"
+            required
+          />
+        </label>
+
         {error && <Alert kind="error">{error}</Alert>}
-        {success && <Alert kind="success">{success}</Alert>}
-        <form className="form" onSubmit={submit}>
-          <div className="field">
-            <label htmlFor="reg-email">Correo</label>
-            <input
-              id="reg-email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="tú@correo.com"
-              required
-              autoComplete="email"
-            />
-          </div>
-          <div className="field">
-            <label htmlFor="reg-username">Nombre de usuario</label>
-            <input
-              id="reg-username"
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="maria_habana"
-              autoComplete="username"
-            />
-          </div>
-          <div className="field">
-            <label htmlFor="reg-password">Contraseña</label>
-            <input
-              id="reg-password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Mínimo 6 caracteres"
-              required
-              autoComplete="new-password"
-            />
-          </div>
-          <button type="submit" className="btn btn-primary btn-lg" disabled={submitting}>
-            {submitting ? 'Creando…' : 'Crear cuenta'}
-          </button>
-        </form>
+
+        <button type="submit" className="btn btn-primary btn-block btn-lg" disabled={loading}>
+          {loading ? 'Creando…' : 'Crear cuenta'}
+        </button>
+
         <p className="auth-foot">
-          ¿Ya tienes cuenta? <Link to="/entrar">Ingresar</Link>
+          ¿Ya tienes cuenta? <Link to="/entrar">Inicia sesión</Link>
         </p>
-      </div>
+      </form>
     </div>
   )
 }
