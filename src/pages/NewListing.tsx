@@ -6,7 +6,9 @@ import { uploadImage, storageUrl } from '../lib/images'
 import { LoadingBlock, EmptyState, Alert } from '../components/Pagination'
 import { useAuth } from '../context/AuthContext'
 import { CURRENCIES, PERIODS, PROVINCES } from '../lib/cuba'
-import { ImagePlus, Leaf, Tag, Truck, Handshake, X } from 'lucide-react'
+import { ImagePlus, Leaf, Tag, Truck, Handshake, X, Sparkles, Hourglass, Lock } from 'lucide-react'
+import { useSeller } from '../context/SellerContext'
+import { planPerks } from '../lib/plans'
 
 const EMPTY = {
   title: '',
@@ -31,6 +33,11 @@ export default function NewListing() {
   const { user, profile, loading: authLoading } = useAuth()
   const navigate = useNavigate()
   const fileRef = useRef<HTMLInputElement>(null)
+  const { canSell, plan, plans, isAdmin, status: sellerStatus, loading: sellerLoading, refresh: refreshSeller } = useSeller()
+  /** Fotos permitidas según el plan (el administrador no tiene límite de plan) */
+  const maxPhotos = isAdmin ? 12 : plan?.max_photos ?? 4
+  const atListingLimit =
+    !editId && !isAdmin && !!plan?.max_listings && (sellerStatus?.active_listings ?? 0) >= plan.max_listings
 
   const [categories, setCategories] = useState<Category[]>([])
   const [images, setImages] = useState<string[]>([])
@@ -94,8 +101,8 @@ export default function NewListing() {
   async function onPickImages(e: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? [])
     if (!user || files.length === 0) return
-    const room = 8 - images.length
-    if (room <= 0) return setError('Máximo 8 imágenes.')
+    const room = maxPhotos - images.length
+    if (room <= 0) return setError(`Tu plan permite ${maxPhotos} fotos por anuncio.`)
     setUploading(true)
     setError('')
     const uploaded: string[] = []
@@ -129,6 +136,7 @@ export default function NewListing() {
     if (original !== null && (isNaN(original) || original <= price)) return setError('El precio anterior debe ser mayor que el precio actual.')
     const stock = Math.max(0, Math.floor(Number(form.stock) || 0))
     if (stock < 1) return setError('El stock debe ser al menos 1.')
+    if (images.length > maxPhotos) return setError(`Tu plan permite ${maxPhotos} fotos por anuncio. Quita ${images.length - maxPhotos}.`)
 
     const payload = {
       category_id: Number(form.category_id),
@@ -155,10 +163,11 @@ export default function NewListing() {
       : await supabase.from('listings').insert({ ...payload, seller_id: user.id, status: 'active' }).select('id').single()
     setSaving(false)
     if (res.error) return setError(res.error.message)
+    refreshSeller()
     navigate(`/publicacion/${res.data.id}`)
   }
 
-  if (authLoading || loadingEdit) return <LoadingBlock />
+  if (authLoading || loadingEdit || (user && sellerLoading)) return <LoadingBlock />
   if (!user)
     return (
       <EmptyState
@@ -168,12 +177,59 @@ export default function NewListing() {
       />
     )
 
+  if (!editId && !canSell) {
+    const pending = sellerStatus?.pending
+    return (
+      <div className="page new-listing">
+        <div className="panel plan-gate">
+          <span className="plan-gate-icon">{pending ? <Hourglass size={26} /> : <Lock size={26} />}</span>
+          <h1>{pending ? 'Tu plan está en revisión' : 'Elige un plan para empezar a vender'}</h1>
+          <p className="muted">
+            {pending
+              ? 'Recibimos tu pago. En cuanto el administrador lo apruebe podrás publicar tus anuncios.'
+              : 'En IslaMercado los vendedores tienen un plan mensual. Así mantenemos el sitio limpio de spam y con vendedores serios.'}
+          </p>
+          {!pending && (
+            <div className="plan-gate-grid">
+              {plans
+                .filter((p) => p.active)
+                .map((p) => (
+                  <Link key={p.id} to={`/planes?plan=${p.id}`} className={`plan-mini ${p.highlight ? 'is-highlight' : ''}`}>
+                    <strong>{p.name}</strong>
+                    <span className="plan-mini-price">
+                      {p.price_usd} <small>USD/mes</small>
+                    </span>
+                    <span className="muted small">{planPerks(p).slice(0, 2).join(' · ')}</span>
+                  </Link>
+                ))}
+            </div>
+          )}
+          <Link to="/planes" className="btn btn-primary btn-lg">
+            <Sparkles size={18} /> {pending ? 'Ver mi solicitud' : 'Ver planes y precios'}
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="page new-listing">
       <div className="page-head">
         <h1 className="page-title"><Tag size={24} strokeWidth={1.6} className="title-icon" /> {editId ? 'Editar anuncio' : 'Publicar anuncio'}</h1>
-        <p className="page-sub">Publicar es gratis. Buenas fotos y una descripción clara venden más rápido.</p>
+        <p className="page-sub">
+          {isAdmin
+            ? 'Publicas como administrador. Buenas fotos y una descripción clara venden más rápido.'
+            : plan
+              ? `Plan ${plan.name}: ${sellerStatus?.active_listings ?? 0} de ${plan.max_listings ?? '∞'} anuncios activos · hasta ${maxPhotos} fotos.`
+              : 'Buenas fotos y una descripción clara venden más rápido.'}
+        </p>
       </div>
+      {atListingLimit && (
+        <Alert kind="info">
+          Ya tienes {sellerStatus?.active_listings} anuncios activos, el máximo de tu plan {plan?.name}.{' '}
+          <Link to="/mis-publicaciones">Pausa alguno</Link> o <Link to="/planes">mejora tu plan</Link> para publicar más.
+        </Alert>
+      )}
 
       <form className="form panel form-wide" onSubmit={onSubmit}>
         <label className="field">
@@ -280,7 +336,7 @@ export default function NewListing() {
         </label>
 
         <div className="field">
-          <span>Fotos ({images.length}/8) · la primera será la portada</span>
+          <span>Fotos ({images.length}/{maxPhotos}) · la primera será la portada</span>
           <input ref={fileRef} type="file" accept="image/*" multiple onChange={onPickImages} style={{ display: 'none' }} />
           <div className="image-preview">
             {images.map((img, i) => (
@@ -290,7 +346,7 @@ export default function NewListing() {
                 <button type="button" onClick={() => setImages((p) => p.filter((_, idx) => idx !== i))} className="img-remove" aria-label="Quitar foto"><X size={12} /></button>
               </div>
             ))}
-            {images.length < 8 && (
+            {images.length < maxPhotos && (
               <button type="button" className="image-add" onClick={() => fileRef.current?.click()} disabled={uploading}>
                 <ImagePlus size={22} strokeWidth={1.5} />
                 <span>{uploading ? 'Subiendo…' : 'Añadir fotos'}</span>
@@ -302,7 +358,7 @@ export default function NewListing() {
         {error && <Alert kind="error">{error}</Alert>}
 
         <div className="form-actions">
-          <button type="submit" className="btn btn-primary btn-lg" disabled={saving || uploading}>
+          <button type="submit" className="btn btn-primary btn-lg" disabled={saving || uploading || atListingLimit}>
             {saving ? 'Guardando…' : editId ? 'Guardar cambios' : 'Publicar artículo'}
           </button>
           <Link to={editId ? '/mis-publicaciones' : '/'} className="btn btn-ghost">Cancelar</Link>

@@ -35,9 +35,35 @@ titulares en **Fraunces** (serif) con texto en **DM Sans**. Iconos de `lucide-re
   *Cancelado* (restaura stock), contacto por WhatsApp y calificación del vendedor al recibir.
 - **Mis publicaciones**: editar, pausar, reactivar, marcar vendida, eliminar.
 - **Publicar**: venta o alquiler (con periodo), moneda (USD/CUP/MLC), precio anterior (oferta),
-  stock, negociable, envío gratis, *Hecho en Cuba* y hasta 8 fotos.
+  stock, negociable, envío gratis, *Hecho en Cuba* y fotos según el plan del vendedor.
+- **Planes de vendedor** (`/planes`) y **panel de administración** (`/admin`): ver abajo.
 - **Mensajes**, **Favoritos**, **perfil de vendedor**, **Auth** por email.
 - Responsive, en español, `HashRouter` para que las rutas profundas funcionen en GitHub Pages.
+
+## Planes para vendedores (suscripciones)
+
+Comprar es gratis; **para publicar hace falta un plan activo** aprobado por el administrador.
+
+| Plan | Precio | Anuncios activos | Fotos | Destacados | Extras |
+|---|---|---|---|---|---|
+| **Emprendedor** | 5 USD/mes | 5 | 4 | — | Carrito, pedidos y WhatsApp |
+| **Negocio** ⭐ | 12 USD/mes | 25 | 8 | 3 | Insignia «Vendedor verificado», estadísticas de visitas |
+| **Tienda** | 25 USD/mes | Ilimitados | 12 | 10 | Insignia «Tienda oficial», sección *Tiendas oficiales* en la portada, estadísticas |
+
+- Descuentos por pago adelantado: **3 meses −10 %**, **6 meses −15 %**, **12 meses −25 %**.
+  Se puede pagar en USD, MLC o CUP (al cambio configurado en `app_settings.cup_rate`).
+- **Flujo**: el vendedor elige plan en `/planes` → paga (Transfermóvil, EnZona, Zelle o efectivo)
+  → envía el n.º de transacción y/o la foto del comprobante → el admin lo **aprueba o rechaza
+  (con motivo)** en `/admin` → el plan se activa al momento.
+- Renovar el mismo plan suma el tiempo al que queda; cambiar de plan reemplaza el anterior.
+- Si el plan vence, los anuncios **se ocultan pero no se borran** y vuelven a verse al renovar.
+  Nadie puede comprar anuncios de vendedores sin plan (`place_order` lo valida).
+- Los límites se aplican **en la base de datos** (trigger `enforce_seller_plan`), no solo en la web.
+- **Panel `/admin`**: pagos pendientes (ver comprobante, WhatsApp, aprobar/rechazar), planes
+  activos (+1 mes, cancelar), historial, **alta directa** (p. ej. pago en efectivo en persona) y
+  **Planes y pagos** (datos de pago que ven los vendedores, tasa CUP, WhatsApp, precios y límites).
+- Administradores: tabla `app_admins` (inicialmente `chain.ff17@icloud.com`). Para añadir otro:
+  `insert into app_admins (user_id) select id from auth.users where email = 'otro@correo.com';`
 
 ## Stack
 
@@ -107,6 +133,10 @@ o como *variables* del repositorio en GitHub, esos valores tienen prioridad.
 
 - `categories`, `listings`, `profiles`, `reviews`, `messages`, `favorites`
 - `cart_items`, `orders`, `order_items`, `questions` (marketplace estilo Mercado Libre)
+- `subscription_plans`, `seller_subscriptions`, `app_settings`, `app_admins` (planes de vendedor);
+  RPC `request_subscription`, `admin_review_subscription`, `admin_grant_subscription`,
+  `admin_update_subscription`, `admin_list_subscriptions`, `my_seller_status`, `get_seller_badges`,
+  `get_official_stores`. Bucket **privado** `payment-receipts` para comprobantes.
 - Todas con **RLS** activa. Los pedidos solo se crean/modifican vía RPC `SECURITY DEFINER`.
 - **RPC**: `place_order(...)` (checkout atómico: valida stock, crea pedidos por vendedor,
   descuenta stock, notifica y vacía el carrito) y `update_order_status(p_order, p_status)`.

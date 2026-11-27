@@ -10,6 +10,7 @@ import { AuthProvider } from './context/AuthContext'
 import { CartProvider } from './context/CartContext'
 import { FavoritesProvider } from './context/FavoritesContext'
 import { PrefsProvider } from './context/PrefsContext'
+import { SellerProvider } from './context/SellerContext'
 import './styles.css'
 
 // HashRouter: las rutas profundas funcionan en GitHub Pages (subruta /islamercado/)
@@ -20,11 +21,13 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       <HashRouter>
         <PrefsProvider>
           <AuthProvider>
-            <FavoritesProvider>
-              <CartProvider>
-                <App />
-              </CartProvider>
-            </FavoritesProvider>
+            <SellerProvider>
+              <FavoritesProvider>
+                <CartProvider>
+                  <App />
+                </CartProvider>
+              </FavoritesProvider>
+            </SellerProvider>
           </AuthProvider>
         </PrefsProvider>
       </HashRouter>
