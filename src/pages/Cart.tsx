@@ -43,7 +43,21 @@ export default function Cart() {
         <div className="panel cart-list">
           {items.map((it) => {
             const l = it.listing
-            if (!l) return null
+            if (!l)
+              return (
+                <div key={it.id} className="cart-row cart-row-bad">
+                  <span className="cart-thumb"><ImageOff size={22} /></span>
+                  <div className="cart-info">
+                    <span className="cart-title">Producto no disponible</span>
+                    <div className="text-danger small">
+                      El vendedor pausó este anuncio o su plan venció. Quítalo para continuar.
+                    </div>
+                    <div className="cart-actions">
+                      <button type="button" className="link-btn" onClick={() => remove(it.listing_id)}><Trash2 size={14} /> Quitar</button>
+                    </div>
+                  </div>
+                </div>
+              )
             const bad = l.status !== 'active' || it.quantity > l.stock
             return (
               <div key={it.id} className={`cart-row ${bad ? 'cart-row-bad' : ''}`}>

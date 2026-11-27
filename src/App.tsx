@@ -18,10 +18,13 @@ import Checkout from './pages/Checkout'
 import Orders from './pages/Orders'
 import MyListings from './pages/MyListings'
 import Categories from './pages/Categories'
+import Plans from './pages/Plans'
 import { LoadingBlock } from './components/Pagination'
 
 // El mapa (Leaflet) se descarga solo cuando se visita: ahorra datos en la portada.
 const MapPage = lazy(() => import('./pages/MapPage'))
+// El panel de administración solo lo descarga el administrador.
+const Admin = lazy(() => import('./pages/Admin'))
 
 function ScrollToTop() {
   const { pathname } = useLocation()
@@ -59,6 +62,8 @@ export default function App() {
             <Route path="/entrar" element={<Login />} />
             <Route path="/registro" element={<Register />} />
             <Route path="/perfil" element={<Profile />} />
+            <Route path="/planes" element={<Plans />} />
+            <Route path="/admin" element={<Admin />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Suspense>
@@ -85,6 +90,7 @@ export default function App() {
           </nav>
           <nav>
             <strong>Vender</strong>
+            <Link to="/planes">Planes para vendedores</Link>
             <Link to="/publicar">Publicar anuncio</Link>
             <Link to="/mis-publicaciones">Mis anuncios</Link>
             <Link to="/mis-ventas">Mis ventas</Link>

@@ -13,6 +13,7 @@ import ListingCard from '../components/ListingCard'
 import { LoadingBlock, EmptyState, Alert } from '../components/Pagination'
 import { useAuth } from '../context/AuthContext'
 import { useCart } from '../context/CartContext'
+import { PlanBadge, useSellerBadges } from '../components/PlanBadge'
 
 export default function ListingDetail() {
   const { id } = useParams<{ id: string }>()
@@ -25,6 +26,7 @@ export default function ListingDetail() {
   const [category, setCategory] = useState<Category | null>(null)
   const [seller, setSeller] = useState<Profile | null>(null)
   const [sellerSales, setSellerSales] = useState(0)
+  const badges = useSellerBadges([seller?.id])
   const [reviews, setReviews] = useState<Review[]>([])
   const [questions, setQuestions] = useState<Question[]>([])
   const [related, setRelated] = useState<Listing[]>([])
@@ -391,7 +393,9 @@ export default function ListingDetail() {
               <Link to={`/vendedor/${seller.id}`} className="seller-row">
                 <span className="avatar-lg">{(seller.username || 'V').slice(0, 2).toUpperCase()}</span>
                 <span className="grow">
-                  <span className="seller-name">{seller.username || 'Vendedor'}</span>
+                  <span className="seller-name">
+                    {seller.username || 'Vendedor'} <PlanBadge badge={badges[seller.id]} size="sm" />
+                  </span>
                   <span className="muted small">{sellerSales} anuncios · desde {formatDate(seller.created_at)}</span>
                 </span>
                 <ChevronRight size={18} className="muted" />

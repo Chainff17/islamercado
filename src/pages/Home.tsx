@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
+  Store,
   ArrowRight,
   ArrowUpDown,
   ChevronDown,
@@ -24,6 +25,7 @@ import ListingCard from '../components/ListingCard'
 import { EmptyState } from '../components/Pagination'
 import { usePrefs } from '../context/PrefsContext'
 import { categoryStyle, FEATURED_CATEGORIES } from '../lib/categoryStyle'
+import { PlanBadge } from '../components/PlanBadge'
 
 type HomeSort = 'recientes' | 'mas-vistos' | 'precio-asc' | 'precio-desc'
 
@@ -42,6 +44,11 @@ function applySort<T extends { order: (c: string, o: { ascending: boolean }) => 
 }
 
 export default function Home() {
+  const [stores, setStores] = useState<Array<{ user_id: string; username: string | null; province: string | null; listings: number }>>([])
+  useEffect(() => {
+    supabase.rpc('get_official_stores').then(({ data }) => setStores((data ?? []) as typeof stores))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const { province, ahorro } = usePrefs()
   const [sort, setSort] = useState<HomeSort>('recientes')
   const [recent, setRecent] = useState<Listing[]>([])
@@ -218,13 +225,40 @@ export default function Home() {
         </section>
       )}
 
+      {stores.length > 0 && (
+        <section className="section">
+          <div className="section-head">
+            <h2 className="section-title">
+              <Store size={22} strokeWidth={1.6} className="title-icon" /> Tiendas oficiales
+            </h2>
+            <Link to="/planes?plan=tienda" className="link-arrow">
+              ¿Tienes una tienda? <ArrowRight size={16} />
+            </Link>
+          </div>
+          <div className="store-grid">
+            {stores.map((st) => (
+              <Link key={st.user_id} to={`/vendedor/${st.user_id}`} className="store-card">
+                <span className="store-avatar">{(st.username || 'T').slice(0, 2).toUpperCase()}</span>
+                <span className="store-info">
+                  <strong>{st.username || 'Tienda'}</strong>
+                  <span className="muted small">
+                    {Number(st.listings)} anuncios{st.province ? ` · ${st.province}` : ''}
+                  </span>
+                  <PlanBadge badge="tienda" size="sm" />
+                </span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
       <section className="section how">
         <h2 className="section-title">Así de fácil</h2>
         <div className="how-grid">
           <div className="how-step">
             <span className="how-icon"><Camera size={22} strokeWidth={1.6} /></span>
-            <h3>Publica gratis</h3>
-            <p>Saca fotos con tu móvil, pon el precio en CUP, USD o MLC y listo.</p>
+            <h3>Publica con tu plan</h3>
+            <p>Planes desde 5 USD al mes. Saca fotos con tu móvil, pon el precio en CUP, USD o MLC y listo.</p>
           </div>
           <div className="how-step">
             <span className="how-icon"><MessageCircle size={22} strokeWidth={1.6} /></span>
@@ -247,11 +281,11 @@ export default function Home() {
 
       <section className="sell-band">
         <div>
-          <h2>¿Tienes algo que ya no usas?</h2>
-          <p>Véndelo hoy a alguien de tu barrio. Publicar es gratis y toma dos minutos.</p>
+          <h2>¿Quieres vender en IslaMercado?</h2>
+          <p>Elige tu plan desde 5 USD al mes y llega a compradores de toda Cuba. Comprar siempre es gratis.</p>
         </div>
-        <Link to="/publicar" className="btn btn-primary btn-lg">
-          Publicar anuncio <ArrowRight size={17} />
+        <Link to="/planes" className="btn btn-primary btn-lg">
+          Ver planes <ArrowRight size={17} />
         </Link>
       </section>
     </div>

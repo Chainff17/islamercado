@@ -6,10 +6,12 @@ import type { Listing, Profile, Review } from '../lib/types'
 import ListingCard from '../components/ListingCard'
 import { Stars, ReviewItem } from '../components/Stars'
 import { LoadingBlock, EmptyState } from '../components/Pagination'
+import { PlanBadge, useSellerBadges } from '../components/PlanBadge'
 
 export default function SellerProfile() {
   const { id } = useParams<{ id: string }>()
   const [seller, setSeller] = useState<Profile | null>(null)
+  const badges = useSellerBadges([id])
   const [listings, setListings] = useState<Listing[]>([])
   const [reviews, setReviews] = useState<Review[]>([])
   const [loading, setLoading] = useState(true)
@@ -72,7 +74,9 @@ export default function SellerProfile() {
           {(seller.username || 'V').slice(0, 2).toUpperCase()}
         </span>
         <div className="seller-header-info">
-          <h1>{seller.username || 'Vendedor'}</h1>
+          <h1>
+            {seller.username || 'Vendedor'} <PlanBadge badge={badges[seller.id]} />
+          </h1>
           <div className="seller-header-meta">
             <Stars value={avg} size="md" />
             <span className="dot">·</span>

@@ -21,10 +21,13 @@ import {
   Wifi,
   WifiOff,
   HelpCircle,
+  ShieldCheck,
+  Sparkles,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useCart } from '../context/CartContext'
 import { usePrefs } from '../context/PrefsContext'
+import { useSeller } from '../context/SellerContext'
 import { supabase } from '../lib/supabase'
 import { PROVINCES } from '../lib/cuba'
 import { categoryStyle } from '../lib/categoryStyle'
@@ -62,6 +65,7 @@ interface Counts {
 export default function Header() {
   const { user, profile, signOut } = useAuth()
   const { count: cartCount } = useCart()
+  const { status: sellerStatus, plan, isAdmin, refresh: refreshSeller } = useSeller()
   const { province, setProvince, ahorro, toggleAhorro } = usePrefs()
   const navigate = useNavigate()
   const [params] = useSearchParams()
@@ -100,12 +104,15 @@ export default function Header() {
       if (active) setCounts({ messages: m.count ?? 0, sales: s.count ?? 0, questions: qq.count ?? 0 })
     }
     load()
-    const t = setInterval(load, 30000)
+    const t = setInterval(() => {
+      load()
+      refreshSeller()
+    }, 30000)
     return () => {
       active = false
       clearInterval(t)
     }
-  }, [user])
+  }, [user, refreshSeller])
 
   function onSearch(e: FormEvent) {
     e.preventDefault()
@@ -113,7 +120,8 @@ export default function Header() {
     navigate(term ? `/buscar?q=${encodeURIComponent(term)}` : '/buscar')
   }
 
-  const totalNotifs = counts.messages + counts.sales + counts.questions
+  const pendingReviews = isAdmin ? sellerStatus?.pending_reviews ?? 0 : 0
+  const totalNotifs = counts.messages + counts.sales + counts.questions + pendingReviews
   const displayName = profile?.username || user?.email?.split('@')[0] || 'Mi cuenta'
 
   return (
@@ -177,6 +185,7 @@ export default function Header() {
                   <NotifItem to="/mensajes" icon={<MessageCircle size={17} />} label="Mensajes sin leer" n={counts.messages} />
                   <NotifItem to="/mis-ventas" icon={<Receipt size={17} />} label="Ventas por confirmar" n={counts.sales} />
                   <NotifItem to="/mis-publicaciones" icon={<HelpCircle size={17} />} label="Preguntas sin responder" n={counts.questions} />
+                  {isAdmin && <NotifItem to="/admin" icon={<ShieldCheck size={17} />} label="Pagos de planes por aprobar" n={pendingReviews} />}
                   {totalNotifs === 0 && <p className="menu-empty">Estás al día. ¡Nada pendiente!</p>}
                 </div>
               )}
@@ -194,6 +203,16 @@ export default function Header() {
                       <strong>{displayName}</strong>
                       <span>{user.email}</span>
                     </div>
+                    {isAdmin && (
+                      <Link to="/admin" className="menu-item menu-admin">
+                        <ShieldCheck size={16} /> Administración
+                        {pendingReviews > 0 && <span className="menu-count">{pendingReviews}</span>}
+                      </Link>
+                    )}
+                    <Link to="/planes" className="menu-item">
+                      <Sparkles size={16} /> Mi plan
+                      <span className={`menu-plan ${plan ? 'is-on' : ''}`}>{plan ? plan.name : sellerStatus?.pending ? 'En revisión' : 'Sin plan'}</span>
+                    </Link>
                     <Link to="/perfil" className="menu-item"><User size={16} /> Mi perfil</Link>
                     <Link to="/mis-publicaciones" className="menu-item"><Package size={16} /> Mis anuncios</Link>
                     <Link to="/mis-compras" className="menu-item"><ShoppingBag size={16} /> Mis compras</Link>

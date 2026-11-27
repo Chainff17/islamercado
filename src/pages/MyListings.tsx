@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ImageOff } from 'lucide-react'
+import { BadgeCheck, EyeOff, ImageOff, Sparkles, Star, TrendingUp } from 'lucide-react'
+import { useSeller } from '../context/SellerContext'
+import { daysLeft } from '../lib/plans'
+import { formatDate } from '../lib/format'
 import { supabase } from '../lib/supabase'
 import { LISTING_SELECT, type Listing } from '../lib/types'
 import { useAuth } from '../context/AuthContext'
@@ -12,6 +15,7 @@ const STATUS_LABEL: Record<string, string> = { active: 'Activa', paused: 'Pausad
 
 export default function MyListings() {
   const { user, loading: authLoading } = useAuth()
+  const { plan, isAdmin, canSell, status: sellerStatus, refresh: refreshSeller } = useSeller()
   const [items, setItems] = useState<Listing[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -38,6 +42,7 @@ export default function MyListings() {
     const { error: err } = await supabase.from('listings').update(values).eq('id', id)
     if (err) return setError(err.message)
     load()
+    refreshSeller()
   }
 
   async function del(id: string) {
@@ -51,6 +56,12 @@ export default function MyListings() {
   if (!user) return <EmptyState title="Inicia sesión" action={<Link to="/entrar" className="btn btn-primary">Entrar</Link>} />
 
   const totalViews = items.reduce((a, l) => a + (l.views ?? 0), 0)
+  const activeCount = items.filter((l) => l.status === 'active').length
+  const featuredCount = items.filter((l) => l.status === 'active' && l.featured).length
+  const canFeature = isAdmin || (plan?.max_featured ?? 0) > 0
+  const showStats = isAdmin || !!plan?.stats
+  const top = showStats ? [...items].filter((l) => l.status === 'active').sort((a, b) => (b.views ?? 0) - (a.views ?? 0)).slice(0, 3) : []
+  const sub = sellerStatus?.subscription
 
   return (
     <div className="page">
@@ -61,6 +72,56 @@ export default function MyListings() {
         </div>
         <Link to="/publicar" className="btn btn-primary">+ Publicar</Link>
       </div>
+      {!isAdmin && (
+        <div className={`panel plan-strip ${canSell ? '' : 'is-off'}`}>
+          {canSell && plan && sub ? (
+            <>
+              <BadgeCheck size={20} className="plan-strip-icon" />
+              <div className="plan-strip-info">
+                <strong>Plan {plan.name}</strong>
+                <span className="muted small">
+                  {activeCount} de {plan.max_listings ?? '∞'} anuncios activos
+                  {plan.max_featured > 0 ? ` · ${featuredCount} de ${plan.max_featured} destacados` : ''} · vence el {formatDate(sub.expires_at!)} ({daysLeft(sub.expires_at)} días)
+                </span>
+              </div>
+              <Link to="/planes" className="btn btn-outline btn-sm">
+                {daysLeft(sub.expires_at) <= 7 ? 'Renovar' : 'Mejorar plan'}
+              </Link>
+            </>
+          ) : (
+            <>
+              <EyeOff size={20} className="plan-strip-icon" />
+              <div className="plan-strip-info">
+                <strong>{sellerStatus?.pending ? 'Tu plan está en revisión' : 'Tus anuncios no se ven en el sitio'}</strong>
+                <span className="muted small">
+                  {sellerStatus?.pending
+                    ? 'En cuanto se apruebe el pago, tus anuncios activos vuelven a ser públicos.'
+                    : 'Necesitas un plan activo para que el público vea tus anuncios. No se borra nada.'}
+                </span>
+              </div>
+              <Link to="/planes" className="btn btn-primary btn-sm">
+                <Sparkles size={15} /> Ver planes
+              </Link>
+            </>
+          )}
+        </div>
+      )}
+      {showStats && top.length > 0 && (
+        <div className="stats-row mylist-stats">
+          <div className="stat">
+            <strong>{totalViews}</strong>
+            <span>Visitas totales</span>
+          </div>
+          {top.map((l) => (
+            <Link key={l.id} to={`/publicacion/${l.id}`} className="stat stat-link">
+              <strong>
+                <TrendingUp size={15} /> {l.views}
+              </strong>
+              <span>{l.title}</span>
+            </Link>
+          ))}
+        </div>
+      )}
       {error && <Alert kind="error">{error}</Alert>}
       {loading ? (
         <LoadingBlock />
@@ -79,9 +140,19 @@ export default function MyListings() {
                   {formatPrice(l.price_usd, l.currency, l.price_period)} · {l.price_period ? 'Alquiler' : `Stock ${l.stock}`} · {l.views} visitas · {timeAgo(l.created_at)}
                 </div>
                 <span className={`status-pill st-${l.status}`}>{STATUS_LABEL[l.status] ?? l.status}</span>
+                {l.featured && l.status === 'active' && (
+                  <span className="status-pill st-featured">
+                    <Star size={11} /> Destacado
+                  </span>
+                )}
               </div>
               <div className="mylist-actions">
                 <Link to={`/editar/${l.id}`} className="btn btn-outline btn-sm">Editar</Link>
+                {canFeature && l.status === 'active' && (
+                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => patch(l.id, { featured: !l.featured })}>
+                    {l.featured ? 'Quitar destacado' : 'Destacar'}
+                  </button>
+                )}
                 {l.status === 'active' && <button type="button" className="btn btn-ghost btn-sm" onClick={() => patch(l.id, { status: 'paused' })}>Pausar</button>}
                 {l.status === 'paused' && <button type="button" className="btn btn-ghost btn-sm" onClick={() => patch(l.id, { status: 'active' })}>Reactivar</button>}
                 {l.status !== 'sold' && <button type="button" className="btn btn-ghost btn-sm" onClick={() => patch(l.id, { status: 'sold' })}>Marcar vendida</button>}
