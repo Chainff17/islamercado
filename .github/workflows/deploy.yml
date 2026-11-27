@@ -32,6 +32,20 @@ jobs:
 
       - name: Build
         run: npm run build
+        env:
+          # Opcional: si defines estas variables del repositorio (Settings → Secrets and
+          # variables → Actions → Variables) se usan; si no, la app usa la configuración
+          # pública del proyecto definida en src/lib/supabase.ts.
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+
+      - name: Verificar build
+        run: |
+          test -f dist/index.html
+          test -f dist/404.html
+          ls dist/assets/*.js > /dev/null
+          grep -q "supabase.co" dist/assets/index-*.js
+          echo "Build OK"
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
