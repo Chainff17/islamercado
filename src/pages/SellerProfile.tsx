@@ -1,88 +1,92 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import type { ListingWithRelations, Profile, Review } from '../lib/types'
+import type { Listing, Profile, Review } from '../lib/types'
 import ListingCard from '../components/ListingCard'
-import Stars, { ReviewItem } from '../components/Stars'
-import { EmptyState, LoadingBlock } from '../components/Pagination'
+import { Stars, ReviewItem } from '../components/Stars'
+import { LoadingBlock, EmptyState } from '../components/Pagination'
 
 export default function SellerProfile() {
   const { id } = useParams<{ id: string }>()
-  const [profile, setProfile] = useState<Profile | null>(null)
-  const [listings, setListings] = useState<ListingWithRelations[]>([])
+  const [seller, setSeller] = useState<Profile | null>(null)
+  const [listings, setListings] = useState<Listing[]>([])
   const [reviews, setReviews] = useState<Review[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     if (!id) return
-    (async () => {
-      const [pRes, lRes, rRes] = await Promise.all([
-        supabase
-          .from('profiles')
-          .select('id, username, phone, avatar_url, created_at')
-          .eq('id', id)
-          .maybeSingle(),
-        supabase
-          .from('listings')
-          .select(
-            'id, seller_id, category_id, title, description, price_usd, negotiable, condition, province, city, images, phone, status, views, created_at, updated_at, category:categories(id,slug,name,icon), seller:profiles(id,username,phone,avatar_url)'
-          )
-          .eq('seller_id', id)
-          .order('created_at', { ascending: false }),
-        supabase
-          .from('reviews')
-          .select('id, author_id, seller_id, rating, comment, created_at, updated_at')
-          .eq('seller_id', id)
-          .order('created_at', { ascending: false }),
-      ])
-      setProfile((pRes.data as Profile) ?? null)
-      setListings((lRes.data as unknown as ListingWithRelations[]) ?? [])
-      setReviews(rRes.data ?? [])
+    let active = true
+    setLoading(true)
+    Promise.all([
+      supabase
+        .from('profiles')
+        .select('id, username, phone, avatar_url, created_at')
+        .eq('id', id)
+        .single(),
+      supabase
+        .from('listings')
+        .select(
+          'id, seller_id, category_id, title, description, price_usd, negotiable, condition, province, city, images, phone, status, views, created_at, updated_at',
+        )
+        .eq('seller_id', id)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('reviews')
+        .select('id, author_id, seller_id, rating, comment, created_at, updated_at')
+        .eq('seller_id', id)
+        .order('created_at', { ascending: false }),
+    ]).then(([s, l, r]) => {
+      if (!active) return
+      setSeller(s.data as Profile)
+      setListings((l.data ?? []) as Listing[])
+      setReviews((r.data ?? []) as Review[])
       setLoading(false)
-    })()
+    })
+    return () => {
+      active = false
+    }
   }, [id])
 
   if (loading) return <LoadingBlock />
-  if (!profile) {
+  if (!seller)
     return (
       <EmptyState
-        icon="👤"
         title="Vendedor no encontrado"
         action={
-          <Link to="/buscar" className="btn btn-primary">
-            Volver a buscar
+          <Link to="/buscar" className="btn btn-outline">
+            Volver
           </Link>
         }
       />
     )
-  }
 
-  const avg = reviews.length ? reviews.reduce((a, r) => a + r.rating, 0) / reviews.length : 0
+  const avg =
+    reviews.length > 0 ? reviews.reduce((a, r) => a + r.rating, 0) / reviews.length : 0
 
   return (
-    <div className="seller-page">
-      <div className="seller-banner">
-        <span className="avatar avatar-xl">{profile.username?.charAt(0).toUpperCase() ?? '👤'}</span>
-        <div>
-          <h1>{profile.username ?? 'Vendedor'}</h1>
-          <div className="seller-sub">
-            {listings.length} publicaciones · {reviews.length} reseñas
-            {avg > 0 && (
-              <>
-                · <Stars value={Math.round(avg)} size="sm" />
-                <span className="muted">({avg.toFixed(1)})</span>
-              </>
-            )}
+    <div className="seller-profile">
+      <div className="seller-header card">
+        <span className="avatar-xl">
+          {(seller.username || 'V').slice(0, 2).toUpperCase()}
+        </span>
+        <div className="seller-header-info">
+          <h1>{seller.username || 'Vendedor'}</h1>
+          <div className="seller-header-meta">
+            <Stars value={avg} size="md" />
+            <span className="dot">·</span>
+            <span>{reviews.length} reseña(s)</span>
+            <span className="dot">·</span>
+            <span>{listings.length} publicación(es)</span>
           </div>
+          {seller.phone && <p className="seller-phone">📞 {seller.phone}</p>}
         </div>
       </div>
 
       <section className="section">
-        <div className="section-head">
-          <h2>Publicaciones de {profile.username}</h2>
-        </div>
+        <h2 className="section-title">Publicaciones</h2>
         {listings.length === 0 ? (
-          <EmptyState icon="📦" title="Sin publicaciones activas" />
+          <EmptyState title="Este vendedor no tiene publicaciones activas" />
         ) : (
           <div className="listing-grid">
             {listings.map((l) => (
@@ -93,15 +97,13 @@ export default function SellerProfile() {
       </section>
 
       <section className="section">
-        <div className="section-head">
-          <h2>Reseñas</h2>
-        </div>
+        <h2 className="section-title">Reseñas</h2>
         {reviews.length === 0 ? (
-          <EmptyState icon="⭐" title="Sin reseñas todavía" />
+          <EmptyState title="Sin reseñas aún" />
         ) : (
           <div className="review-list">
             {reviews.map((r) => (
-              <ReviewItem key={r.id} review={r} />
+              <ReviewItem key={r.id} rating={r.rating} comment={r.comment} createdAt={r.created_at} />
             ))}
           </div>
         )}

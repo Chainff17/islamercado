@@ -1,125 +1,135 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
-import type { ReactNode } from 'react'
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react'
 import { supabase } from '../lib/supabase'
 import type { Profile } from '../lib/types'
 
-interface AuthState {
-  user: Profile | null
+interface AuthUser {
+  id: string
+  email: string
+}
+
+interface AuthContextValue {
+  user: AuthUser | null
+  profile: Profile | null
   loading: boolean
-  signIn: (email: string, password: string) => Promise<{ error: string | null }>
-  signUp: (
-    email: string,
-    password: string,
-    options?: { username?: string }
-  ) => Promise<{ error: string | null }>
+  signIn: (email: string, password: string) => Promise<void>
+  signUp: (email: string, password: string, username: string) => Promise<void>
   signOut: () => Promise<void>
-  updateProfile: (data: { username?: string; phone?: string; avatar_url?: string }) => Promise<{ error: string | null }>
+  refreshProfile: () => Promise<void>
+  updateProfile: (patch: Partial<Pick<Profile, 'username' | 'phone' | 'avatar_url'>>) => Promise<void>
 }
 
-const AuthContext = createContext<AuthState | null>(null)
-
-async function fetchProfile(userId: string): Promise<Profile | null> {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('id, username, phone, avatar_url, created_at')
-    .eq('id', userId)
-    .maybeSingle()
-  if (error || !data) return null
-  return data as Profile
-}
+const AuthContext = createContext<AuthContextValue | null>(null)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<Profile | null>(null)
+  const [user, setUser] = useState<AuthUser | null>(null)
+  const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
+
+  const loadProfile = useCallback(async (uid: string) => {
+    const { data } = await supabase
+      .from('profiles')
+      .select('id, username, phone, avatar_url, created_at')
+      .eq('id', uid)
+      .single()
+    return data as Profile | null
+  }, [])
 
   useEffect(() => {
     let active = true
     supabase.auth.getSession().then(({ data }) => {
+      const session = data.session
       if (!active) return
-      const sessionUser = data.session?.user ?? null
-      if (!sessionUser) {
-        setLoading(false)
-        return
+      if (session) {
+        setUser({ id: session.user.id, email: session.user.email ?? '' })
+        loadProfile(session.user.id).then((p) => {
+          if (active) setProfile(p)
+        })
       }
-      fetchProfile(sessionUser.id).then((p) => {
-        if (!active) return
-        setUser(p)
-        setLoading(false)
-      })
+      if (active) setLoading(false)
     })
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      const sessionUser = session?.user ?? null
-      if (!sessionUser) {
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        setUser({ id: session.user.id, email: session.user.email ?? '' })
+        loadProfile(session.user.id).then(setProfile)
+      } else {
         setUser(null)
-        setLoading(false)
-        return
+        setProfile(null)
       }
-      fetchProfile(sessionUser.id).then((p) => setUser(p))
     })
-
     return () => {
       active = false
-      subscription.unsubscribe()
+      sub.subscription.unsubscribe()
     }
-  }, [])
+  }, [loadProfile])
 
   const signIn = useCallback(async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (!error) {
-      const { data } = await supabase.auth.getSession()
-      if (data.session) setUser(await fetchProfile(data.session.user.id))
-    }
-    return { error: error?.message ?? null }
+    if (error) throw new Error(error.message)
   }, [])
 
   const signUp = useCallback(
-    async (email: string, password: string, options?: { username?: string }) => {
+    async (email: string, password: string, username: string) => {
       const { error } = await supabase.auth.signUp({
         email,
         password,
-        options: {
-          data: { username: options?.username || email.split('@')[0] },
-        },
+        options: { data: { username } },
       })
-      return { error: error?.message ?? null }
+      if (error) throw new Error(error.message)
     },
-    []
+    [],
   )
 
   const signOut = useCallback(async () => {
-    await supabase.auth.signOut()
-    setUser(null)
+    const { error } = await supabase.auth.signOut()
+    if (error) throw new Error(error.message)
   }, [])
 
+  const refreshProfile = useCallback(async () => {
+    if (!user) return
+    const p = await loadProfile(user.id)
+    setProfile(p)
+  }, [user, loadProfile])
+
   const updateProfile = useCallback(
-    async (data: { username?: string; phone?: string; avatar_url?: string }) => {
-      if (!user) return { error: 'No hay usuario autenticado' }
-      const payload: Record<string, string> = {}
-      if (data.username !== undefined) payload.username = data.username
-      if (data.phone !== undefined) payload.phone = data.phone
-      if (data.avatar_url !== undefined) payload.avatar_url = data.avatar_url
+    async (patch: Partial<Pick<Profile, 'username' | 'phone' | 'avatar_url'>>) => {
+      if (!user) throw new Error('No hay usuario autenticado')
       const { error } = await supabase
         .from('profiles')
-        .update(payload)
+        .update(patch)
         .eq('id', user.id)
-      if (!error) setUser({ ...user, ...payload })
-      return { error: error?.message ?? null }
+      if (error) throw new Error(error.message)
+      const updated = await loadProfile(user.id)
+      setProfile(updated)
     },
-    [user]
+    [user, loadProfile],
   )
 
   const value = useMemo(
-    () => ({ user, loading, signIn, signUp, signOut, updateProfile }),
-    [user, loading, signIn, signUp, signOut, updateProfile]
+    () => ({
+      user,
+      profile,
+      loading,
+      signIn,
+      signUp,
+      signOut,
+      refreshProfile,
+      updateProfile,
+    }),
+    [user, profile, loading, signIn, signUp, signOut, refreshProfile, updateProfile],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
-export function useAuth(): AuthState {
+export function useAuth(): AuthContextValue {
   const ctx = useContext(AuthContext)
   if (!ctx) throw new Error('useAuth debe usarse dentro de AuthProvider')
   return ctx

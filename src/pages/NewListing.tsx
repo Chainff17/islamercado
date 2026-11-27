@@ -1,179 +1,142 @@
-import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { useAuth } from '../context/AuthContext'
 import type { Category } from '../lib/types'
-import { Alert, EmptyState, LoadingBlock } from '../components/Pagination'
-
-const PROVINCES = [
-  'La Habana',
-  'Santiago de Cuba',
-  'Holguín',
-  'Camagüey',
-  'Cienfuegos',
-  'Villa Clara',
-  'Matanzas',
-  'Pinar del Río',
-  'Isla de la Juventud',
-  'Granma',
-  'Las Tunas',
-  'Sancti Spíritus',
-  'Ciego de Ávila',
-]
-
-const CONDITIONS = [
-  { value: 'nuevo', label: 'Nuevo' },
-  { value: 'como_nuevo', label: 'Como nuevo' },
-  { value: 'usado', label: 'Usado' },
-  { value: 'defectuoso', label: 'Con defectos' },
-]
+import { uploadImage, storageUrl } from '../lib/images'
+import { LoadingBlock, EmptyState, Alert } from '../components/Pagination'
+import { useAuth } from '../context/AuthContext'
 
 export default function NewListing() {
   const { user, loading: authLoading } = useAuth()
   const navigate = useNavigate()
+  const fileRef = useRef<HTMLInputElement>(null)
+
   const [categories, setCategories] = useState<Category[]>([])
-  const [loading, setLoading] = useState(true)
-  const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<string | null>(null)
+  const [images, setImages] = useState<string[]>([])
+  const [uploading, setUploading] = useState(false)
+  const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
 
   const [form, setForm] = useState({
     title: '',
-    description: '',
     category_id: '',
     price_usd: '',
     condition: 'usado',
-    province: 'La Habana',
+    province: '',
     city: '',
-    negotiable: false,
     phone: '',
+    negotiable: false,
+    description: '',
   })
-  const [images, setImages] = useState<string[]>([])
-  const [uploading, setUploading] = useState(false)
 
   useEffect(() => {
     supabase
       .from('categories')
       .select('id, slug, name, icon')
-      .order('name')
-      .then(({ data }) => {
-        setCategories(data ?? [])
-        setLoading(false)
-      })
+      .order('id')
+      .then(({ data }) => setCategories(data ?? []))
   }, [])
 
-  const set = (key: string, value: string | boolean) =>
-    setForm((f) => ({ ...f, [key]: value }))
+  function update<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
+    setForm((prev) => ({ ...prev, [key]: value }))
+  }
 
-  const onFiles = async (files: FileList | null) => {
-    if (!files || !user) return
+  async function onPickImages(e: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? [])
+    if (!user || files.length === 0) return
     setUploading(true)
-    const newFiles = Array.from(files)
+    setError('')
     const uploaded: string[] = []
-    for (const file of newFiles) {
-      const path = `${user.id}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`
-      const { error } = await supabase.storage
-        .from('listing-images')
-        .upload(path, file, { contentType: file.type })
-      if (error) {
-        setError(`Error al subir imagen: ${error.message}`)
-        setUploading(false)
-        return
+    for (const file of files.slice(0, 8)) {
+      try {
+        uploaded.push(await uploadImage(file, user.id))
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Error al subir la imagen')
+        break
       }
-      const { data } = supabase.storage.from('listing-images').getPublicUrl(path)
-      uploaded.push(data.publicUrl)
     }
     setImages((prev) => [...prev, ...uploaded])
     setUploading(false)
+    if (fileRef.current) fileRef.current.value = ''
   }
 
-  const removeImage = (i: number) => {
+  function removeImage(i: number) {
     setImages((prev) => prev.filter((_, idx) => idx !== i))
   }
 
-  const submit = async (e: React.FormEvent) => {
+  async function onSubmit(e: FormEvent) {
     e.preventDefault()
-    setError(null)
-    setSuccess(null)
-
     if (!user) return
-    if (!form.title.trim() || !form.description.trim() || !form.category_id || !form.price_usd) {
-      setError('Completa los campos obligatorios: título, descripción, categoría y precio.')
-      return
-    }
-    const price = parseFloat(form.price_usd)
-    if (Number.isNaN(price) || price < 0) {
-      setError('El precio debe ser un número válido mayor o igual a 0.')
-      return
-    }
+    setError('')
 
-    setSubmitting(true)
+    if (!form.title.trim()) return setError('El título es obligatorio.')
+    if (!form.category_id) return setError('Selecciona una categoría.')
+    const price = Number(form.price_usd)
+    if (!form.price_usd || isNaN(price) || price < 0)
+      return setError('Ingresa un precio válido.')
+    if (!form.province.trim()) return setError('La provincia es obligatoria.')
+
+    setSaving(true)
     const { error: err } = await supabase.from('listings').insert({
       seller_id: user.id,
-      category_id: parseInt(form.category_id, 10),
+      category_id: Number(form.category_id),
       title: form.title.trim(),
       description: form.description.trim(),
       price_usd: price,
       negotiable: form.negotiable,
       condition: form.condition,
-      province: form.province,
+      province: form.province.trim(),
       city: form.city.trim() || null,
-      phone: form.phone.trim() || null,
       images,
+      phone: form.phone.trim() || null,
       status: 'active',
     })
-    setSubmitting(false)
+    setSaving(false)
     if (err) {
       setError(err.message)
       return
     }
-    setSuccess('Publicación creada con éxito. ¡Listo para vender!')
-    setTimeout(() => navigate('/'), 1500)
+    navigate('/')
   }
 
   if (authLoading) return <LoadingBlock />
-  if (!user) {
+  if (!user)
     return (
       <EmptyState
-        icon="🔐"
         title="Inicia sesión para publicar"
-        message="Debes estar registrado para publicar artículos en Isla Mercado."
+        message="Necesitas una cuenta para publicar un artículo en Isla Mercado."
         action={
-          <button className="btn btn-primary" onClick={() => navigate('/entrar')}>
-            Ingresar
-          </button>
+          <Link to="/entrar" className="btn btn-primary">
+            Entrar
+          </Link>
         }
       />
     )
-  }
-  if (loading) return <LoadingBlock />
 
   return (
-    <div className="form-page">
-      <div className="section-head">
-        <h2>Publicar un artículo</h2>
+    <div className="page new-listing">
+      <div className="page-head">
+        <h1>Publicar un artículo</h1>
+        <p className="page-sub">Completa los datos y añade fotos. Tu publicación aparecerá en el mercado.</p>
       </div>
-      {error && <Alert kind="error">{error}</Alert>}
-      {success && <Alert kind="success">{success}</Alert>}
-      <form className="form" onSubmit={submit}>
-        <div className="form-grid">
-          <div className="field">
-            <label htmlFor="title">Título *</label>
+
+      <form className="form card" onSubmit={onSubmit}>
+        <div className="form-row">
+          <label className="field">
+            <span>Título *</span>
             <input
-              id="title"
               type="text"
               value={form.title}
-              onChange={(e) => set('title', e.target.value)}
-              placeholder="Ej.: TV LED 43 pulgadas Smart"
+              onChange={(e) => update('title', e.target.value)}
+              placeholder={`Ej: Televisor Smart TV 43"`}
               required
             />
-          </div>
-          <div className="field">
-            <label htmlFor="category">Categoría *</label>
+          </label>
+          <label className="field">
+            <span>Categoría *</span>
             <select
-              id="category"
               value={form.category_id}
-              onChange={(e) => set('category_id', e.target.value)}
+              onChange={(e) => update('category_id', e.target.value)}
               required
             >
               <option value="">Seleccionar…</option>
@@ -183,121 +146,127 @@ export default function NewListing() {
                 </option>
               ))}
             </select>
-          </div>
-          <div className="field">
-            <label htmlFor="price">Precio (USD) *</label>
+          </label>
+        </div>
+
+        <div className="form-row">
+          <label className="field">
+            <span>Precio (USD) *</span>
             <input
-              id="price"
               type="number"
-              step="0.01"
               min="0"
+              step="0.01"
               value={form.price_usd}
-              onChange={(e) => set('price_usd', e.target.value)}
-              placeholder="210.00"
+              onChange={(e) => update('price_usd', e.target.value)}
+              placeholder="120.00"
               required
             />
-          </div>
-          <div className="field">
-            <label htmlFor="condition">Estado</label>
-            <select
-              id="condition"
-              value={form.condition}
-              onChange={(e) => set('condition', e.target.value)}
-            >
-              {CONDITIONS.map((c) => (
-                <option key={c.value} value={c.value}>
-                  {c.label}
-                </option>
-              ))}
+          </label>
+          <label className="field">
+            <span>Condición</span>
+            <select value={form.condition} onChange={(e) => update('condition', e.target.value)}>
+              <option value="nuevo">Nuevo</option>
+              <option value="like-new">Como nuevo</option>
+              <option value="usado">Usado</option>
+              <option value="mal">En mal estado</option>
             </select>
-          </div>
-          <div className="field">
-            <label htmlFor="province">Provincia *</label>
-            <select
-              id="province"
-              value={form.province}
-              onChange={(e) => set('province', e.target.value)}
-            >
-              {PROVINCES.map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
-            <label htmlFor="city">Ciudad / Reparto</label>
+          </label>
+        </div>
+
+        <div className="form-row">
+          <label className="field">
+            <span>Provincia *</span>
             <input
-              id="city"
+              type="text"
+              value={form.province}
+              onChange={(e) => update('province', e.target.value)}
+              placeholder="Ej: La Habana"
+              required
+            />
+          </label>
+          <label className="field">
+            <span>Ciudad / Municipio</span>
+            <input
               type="text"
               value={form.city}
-              onChange={(e) => set('city', e.target.value)}
-              placeholder="Ej.: Vedado, Playa…"
+              onChange={(e) => update('city', e.target.value)}
+              placeholder="Ej: Plaza de la Revolución"
             />
-          </div>
-          <div className="field">
-            <label htmlFor="phone">Teléfono de contacto</label>
-            <input
-              id="phone"
-              type="tel"
-              value={form.phone}
-              onChange={(e) => set('phone', e.target.value)}
-              placeholder="Ej.: 5351234567"
-            />
-          </div>
-          <div className="field field-check">
-            <label>
-              <input
-                type="checkbox"
-                checked={form.negotiable}
-                onChange={(e) => set('negotiable', e.target.checked)}
-              />
-              El precio es negociable
-            </label>
-          </div>
+          </label>
         </div>
 
-        <div className="field">
-          <label htmlFor="desc">Descripción *</label>
+        <label className="field">
+          <span>Teléfono de contacto</span>
+          <input
+            type="tel"
+            value={form.phone}
+            onChange={(e) => update('phone', e.target.value)}
+            placeholder="+53 7 xxx xxxx"
+          />
+        </label>
+
+        <label className="checkbox-field">
+          <input
+            type="checkbox"
+            checked={form.negotiable}
+            onChange={(e) => update('negotiable', e.target.checked)}
+          />
+          <span>Precio negociable</span>
+        </label>
+
+        <label className="field">
+          <span>Descripción</span>
           <textarea
-            id="desc"
             rows={5}
             value={form.description}
-            onChange={(e) => set('description', e.target.value)}
-            placeholder="Describe el artículo, estado, características y condiciones de entrega…"
-            required
+            onChange={(e) => update('description', e.target.value)}
+            placeholder="Describe el estado, características y cualquier detalle relevante…"
           />
-        </div>
+        </label>
 
         <div className="field">
-          <label>Imágenes</label>
-          <div className="image-uploader">
-            {images.map((img, i) => (
-              <div key={i} className="image-preview">
-                <img src={img} alt={`Subida ${i + 1}`} />
-                <button type="button" className="image-remove" onClick={() => removeImage(i)}>
-                  ✕
-                </button>
-              </div>
-            ))}
-            <label className="image-add">
-              {uploading ? 'Subiendo…' : '+ Agregar imagen'}
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                hidden
-                onChange={(e) => onFiles(e.target.files)}
-              />
-            </label>
+          <span>Imágenes (máximo 8)</span>
+          <div className="image-picker">
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={onPickImages}
+              style={{ display: 'none' }}
+            />
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={() => fileRef.current?.click()}
+              disabled={uploading}
+            >
+              {uploading ? 'Subiendo…' : 'Añadir imágenes'}
+            </button>
           </div>
-          <p className="muted">Las imágenes se suben al bucket <code>listing-images</code> bajo tu carpeta de usuario.</p>
+          {images.length > 0 && (
+            <div className="image-preview">
+              {images.map((img, i) => (
+                <div key={i} className="image-preview-item">
+                  <img src={storageUrl(img)} alt={`Imagen ${i + 1}`} />
+                  <button type="button" onClick={() => removeImage(i)} className="img-remove">
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
+        {error && <Alert kind="error">{error}</Alert>}
+
         <div className="form-actions">
-          <button type="submit" className="btn btn-primary btn-lg" disabled={submitting}>
-            {submitting ? 'Publicando…' : 'Publicar artículo'}
+          <button type="submit" className="btn btn-primary btn-lg" disabled={saving}>
+            {saving ? 'Publicando…' : 'Publicar artículo'}
           </button>
+          <Link to="/" className="btn btn-ghost">
+            Cancelar
+          </Link>
         </div>
       </form>
     </div>

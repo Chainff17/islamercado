@@ -1,110 +1,125 @@
-import { useEffect, useMemo, useState } from 'react'
-import { useParams, useSearchParams } from 'react-router-dom'
+import { useEffect, useState, type ChangeEvent } from 'react'
+import { useParams, useSearchParams, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import type { Category, ListingWithRelations } from '../lib/types'
+import type { Category, Listing, SortKey } from '../lib/types'
 import ListingCard from '../components/ListingCard'
-import { EmptyState, LoadingBlock } from '../components/Pagination'
+import { LoadingBlock, EmptyState } from '../components/Pagination'
 
-type SortKey = 'recientes' | 'precio-asc' | 'precio-desc' | 'mas-vistos'
+const SORTS: { key: SortKey; label: string }[] = [
+  { key: 'recientes', label: 'Más recientes' },
+  { key: 'mas-vistos', label: 'Más vistos' },
+  { key: 'precio-asc', label: 'Precio: menor a mayor' },
+  { key: 'precio-desc', label: 'Precio: mayor a menor' },
+]
 
 export default function Browse() {
-  const { slug } = useParams<{ slug: string }>()
-  const [searchParams, setSearchParams] = useSearchParams()
-  const q = searchParams.get('q') ?? ''
+  const { slug } = useParams()
+  const [params, setParams] = useSearchParams()
+
+  const q = params.get('q') ?? ''
+  const categorySlug = slug ?? ''
+  const [sort, setSort] = useState<SortKey>('recientes')
 
   const [categories, setCategories] = useState<Category[]>([])
-  const [listings, setListings] = useState<ListingWithRelations[]>([])
+  const [listings, setListings] = useState<Listing[]>([])
   const [loading, setLoading] = useState(true)
-
-  const [categorySel, setCategorySel] = useState<string>(slug ?? 'todas')
-  const [sort, setSort] = useState<SortKey>('recientes')
 
   useEffect(() => {
     supabase
       .from('categories')
       .select('id, slug, name, icon')
-      .order('name')
+      .order('id')
       .then(({ data }) => setCategories(data ?? []))
   }, [])
 
   useEffect(() => {
-    if (slug) setCategorySel(slug)
-  }, [slug])
+    if (!categorySlug) return
+    let active = true
+    setLoading(true)
+
+    supabase
+      .from('categories')
+      .select('id')
+      .eq('slug', categorySlug)
+      .single()
+      .then(({ data }) => {
+        if (!active) return
+        const catId = data?.id
+        loadListings(catId)
+      })
+
+    return () => {
+      active = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categorySlug, q, sort])
 
   useEffect(() => {
-    setLoading(true);
-    (async () => {
-      let query = supabase
-        .from('listings')
-        .select(
-          'id, seller_id, category_id, title, description, price_usd, negotiable, condition, province, city, images, phone, status, views, created_at, updated_at, category:categories(id,slug,name,icon), seller:profiles(id,username,phone,avatar_url)'
-        )
-        .eq('status', 'active')
+    if (categorySlug) return
+    setLoading(true)
+    loadListings(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categorySlug, q, sort])
 
-      if (categorySel && categorySel !== 'todas') {
-        const cat = categories.find((c) => c.slug === categorySel)
-        if (cat) query = query.eq('category_id', cat.id)
-      }
-      if (q.trim()) {
-        query = query.ilike('title', `%${q.trim()}%`)
-      }
+  async function loadListings(catId: number | null) {
+    const query = supabase
+      .from('listings')
+      .select(
+        'id, seller_id, category_id, title, description, price_usd, negotiable, condition, province, city, images, phone, status, views, created_at, updated_at',
+      )
+      .eq('status', 'active')
 
-      if (sort === 'precio-asc') query = query.order('price_usd', { ascending: true })
-      else if (sort === 'precio-desc') query = query.order('price_usd', { ascending: false })
-      else if (sort === 'mas-vistos') query = query.order('views', { ascending: false })
-      else query = query.order('created_at', { ascending: false })
+    if (q.trim()) query.ilike('title', `%${q.trim()}%`)
+    if (catId !== null) query.eq('category_id', catId)
 
-      query = query.limit(100)
-      const { data, error } = await query
-      if (error) console.error(error)
-      setListings((data as unknown as ListingWithRelations[]) ?? [])
-      setLoading(false)
-    })()
-  }, [categorySel, q, sort, slug, categories])
-
-  const filteredTitle = useMemo(() => {
-    if (q.trim()) return `Resultados para «${q.trim()}»`
-    if (categorySel && categorySel !== 'todas') {
-      return categories.find((c) => c.slug === categorySel)?.name ?? 'Categoría'
+    let orderCol = 'created_at'
+    let orderAsc = false
+    if (sort === 'mas-vistos') {
+      orderCol = 'views'
+      orderAsc = false
+    } else if (sort === 'precio-asc') {
+      orderCol = 'price_usd'
+      orderAsc = true
+    } else if (sort === 'precio-desc') {
+      orderCol = 'price_usd'
+      orderAsc = false
     }
-    return 'Todos los artículos'
-  }, [q, categorySel, categories])
+    query.order(orderCol, { ascending: orderAsc }).limit(60)
+
+    const { data } = await query
+    setListings((data ?? []) as Listing[])
+    setLoading(false)
+  }
+
+  function onCategoryChange(e: ChangeEvent<HTMLSelectElement>) {
+    const value = e.target.value
+    const next = new URLSearchParams(params)
+    if (value) next.set('cat', value)
+    else next.delete('cat')
+    setParams(next)
+  }
+
+  const selectedCat = params.get('cat') ?? ''
 
   return (
     <div className="browse">
-      <div className="section-head">
-        <h2>{filteredTitle}</h2>
-        <span className="result-count">{listings.length} resultados</span>
-      </div>
-
-      <div className="browse-toolbar">
-        <div className="filter-group">
-          <label htmlFor="cat">Categoría</label>
-          <select
-            id="cat"
-            value={categorySel}
-            onChange={(e) => {
-              setCategorySel(e.target.value)
-              if (e.target.value !== 'todas') {
-                setSearchParams(q ? { q } : {})
-              }
-            }}
-          >
-            <option value="todas">Todas</option>
+      <div className="page-head">
+        <h1>{q ? `Resultados para “${q}”` : categorySlug ? 'Categoría' : 'Explorar artículos'}</h1>
+        <div className="browse-controls">
+          <select value={selectedCat} onChange={onCategoryChange}>
+            <option value="">Todas las categorías</option>
             {categories.map((c) => (
               <option key={c.id} value={c.slug}>
-                {c.name}
+                {c.icon} {c.name}
               </option>
             ))}
           </select>
-        </div>
-        <div className="filter-group">
-          <label htmlFor="sort">Ordenar</label>
-          <select id="sort" value={sort} onChange={(e) => setSort(e.target.value as SortKey)}>
-            <option value="recientes">Más recientes</option>
-            <option value="mas-vistos">Más vistos</option>
-            <option value="precio-asc">Precio: menor a mayor</option>
-            <option value="precio-desc">Precio: mayor a menor</option>
+          <select value={sort} onChange={(e) => setSort(e.target.value as SortKey)}>
+            {SORTS.map((s) => (
+              <option key={s.key} value={s.key}>
+                {s.label}
+              </option>
+            ))}
           </select>
         </div>
       </div>
@@ -113,19 +128,12 @@ export default function Browse() {
         <LoadingBlock />
       ) : listings.length === 0 ? (
         <EmptyState
-          icon="📭"
-          title="No hay resultados"
-          message="Prueba con otra búsqueda o categoría."
+          title="No encontramos artículos"
+          message="Probá cambiar la búsqueda o el filtro de categoría."
           action={
-            <button
-              className="btn btn-primary"
-              onClick={() => {
-                setCategorySel('todas')
-                setSearchParams({})
-              }}
-            >
+            <Link to="/buscar" className="btn btn-outline">
               Limpiar filtros
-            </button>
+            </Link>
           }
         />
       ) : (
