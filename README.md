@@ -78,6 +78,15 @@ La configuración oficial de Supabase de **este repositorio** (islamercado) est�
 - **`.env`** — variables `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` (no versionadas).
 - **`.env.example`** — plantilla para clonar/cambiar de máquina.
 
+### Configuración del cliente en producción (GitHub Pages)
+
+El `.env` no se versiona, así que la compilación de GitHub Actions no lo tiene. Por eso
+`src/lib/supabase.ts` incluye la **URL y la clave `anon` pública** del proyecto como valores por
+defecto (la clave anon es pública por diseño: viaja en el JavaScript y los datos están protegidos
+por RLS en todas las tablas). Si defines `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` en `.env`
+o como *variables* del repositorio en GitHub, esos valores tienen prioridad.
+**Nunca** pongas la clave `service_role` en el código del cliente.
+
 ### Proyecto correspondiente
 
 | Campo | Valor |

@@ -5,6 +5,7 @@ import '@fontsource-variable/fraunces/wght.css'
 import '@fontsource-variable/fraunces/wght-italic.css'
 import '@fontsource-variable/dm-sans/wght.css'
 import App from './App'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { AuthProvider } from './context/AuthContext'
 import { CartProvider } from './context/CartContext'
 import { FavoritesProvider } from './context/FavoritesContext'
@@ -15,16 +16,18 @@ import './styles.css'
 // sin depender de redirecciones 404 del servidor.
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <HashRouter>
-      <PrefsProvider>
-        <AuthProvider>
-          <FavoritesProvider>
-            <CartProvider>
-              <App />
-            </CartProvider>
-          </FavoritesProvider>
-        </AuthProvider>
-      </PrefsProvider>
-    </HashRouter>
+    <ErrorBoundary>
+      <HashRouter>
+        <PrefsProvider>
+          <AuthProvider>
+            <FavoritesProvider>
+              <CartProvider>
+                <App />
+              </CartProvider>
+            </FavoritesProvider>
+          </AuthProvider>
+        </PrefsProvider>
+      </HashRouter>
+    </ErrorBoundary>
   </React.StrictMode>,
 )
