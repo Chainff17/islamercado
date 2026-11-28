@@ -37,6 +37,9 @@ export interface Listing {
   price_period: string | null
   created_at: string
   updated_at: string
+  /** Moderación: si tiene fecha, el anuncio está bloqueado y solo lo ve su dueño */
+  blocked_at?: string | null
+  blocked_reason?: string | null
 }
 
 export interface Review {
@@ -131,4 +134,4 @@ export interface SellerSummary {
 }
 
 export const LISTING_SELECT =
-  'id, seller_id, category_id, title, description, price_usd, currency, negotiable, condition, province, city, images, phone, status, views, stock, original_price, free_shipping, featured, made_in_cuba, price_period, created_at, updated_at'
+  'id, seller_id, category_id, title, description, price_usd, currency, negotiable, condition, province, city, images, phone, status, views, stock, original_price, free_shipping, featured, made_in_cuba, price_period, created_at, updated_at, blocked_at, blocked_reason'

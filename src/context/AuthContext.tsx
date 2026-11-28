@@ -9,6 +9,7 @@ import {
 } from 'react'
 import { supabase } from '../lib/supabase'
 import type { Profile } from '../lib/types'
+import { authRedirectUrl } from '../lib/authSecurity'
 
 interface AuthUser {
   id: string
@@ -19,8 +20,22 @@ interface AuthContextValue {
   user: AuthUser | null
   profile: Profile | null
   loading: boolean
-  signIn: (email: string, password: string) => Promise<void>
-  signUp: (email: string, password: string, username: string) => Promise<void>
+  /** mfaRequired = la cuenta tiene verificación en 2 pasos y falta introducir el código */
+  signIn: (email: string, password: string) => Promise<{ mfaRequired: boolean }>
+  /** needsConfirmation = hay que confirmar el correo antes de entrar */
+  signUp: (email: string, password: string, username: string) => Promise<{ needsConfirmation: boolean }>
+  resendConfirmation: (email: string) => Promise<void>
+  requestPasswordReset: (email: string) => Promise<void>
+  verifyRecoveryCode: (email: string, code: string) => Promise<void>
+  updatePassword: (password: string) => Promise<void>
+  /** Verifica el código TOTP del primer factor y eleva la sesión a AAL2 */
+  verifyMfa: (code: string) => Promise<void>
+  /** La sesión entró desde un enlace de recuperación de contraseña */
+  recovery: boolean
+  clearRecovery: () => void
+  /** Aviso global (p. ej. "correo confirmado") */
+  notice: string
+  setNotice: (msg: string) => void
   signOut: () => Promise<void>
   refreshProfile: () => Promise<void>
   updateProfile: (patch: Partial<Pick<Profile, 'username' | 'phone' | 'avatar_url'>>) => Promise<void>
@@ -32,6 +47,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
+  const [recovery, setRecovery] = useState(false)
+  const [notice, setNotice] = useState('')
 
   const loadProfile = useCallback(async (uid: string) => {
     const { data } = await supabase
@@ -55,7 +72,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       if (active) setLoading(false)
     })
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') setRecovery(true)
       if (session) {
         setUser({ id: session.user.id, email: session.user.email ?? '' })
         loadProfile(session.user.id).then(setProfile)
@@ -73,16 +91,54 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signIn = useCallback(async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) throw new Error(error.message)
+    const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+    return { mfaRequired: !!aal && aal.nextLevel === 'aal2' && aal.currentLevel !== 'aal2' }
   }, [])
+
+  const verifyMfa = useCallback(async (code: string) => {
+    const { data, error } = await supabase.auth.mfa.listFactors()
+    if (error) throw new Error(error.message)
+    const factor = data.totp.find((f) => f.status === 'verified')
+    if (!factor) throw new Error('No tienes la verificación en 2 pasos configurada.')
+    const { error: vErr } = await supabase.auth.mfa.challengeAndVerify({ factorId: factor.id, code: code.replace(/\s/g, '') })
+    if (vErr) throw new Error(vErr.message)
+  }, [])
+
+  const resendConfirmation = useCallback(async (email: string) => {
+    const { error } = await supabase.auth.resend({ type: 'signup', email, options: { emailRedirectTo: authRedirectUrl() } })
+    if (error) throw new Error(error.message)
+  }, [])
+
+  const requestPasswordReset = useCallback(async (email: string) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: authRedirectUrl() })
+    if (error) throw new Error(error.message)
+  }, [])
+
+  const verifyRecoveryCode = useCallback(async (email: string, code: string) => {
+    const { error } = await supabase.auth.verifyOtp({ email, token: code.replace(/\s/g, ''), type: 'recovery' })
+    if (error) throw new Error(error.message)
+    setRecovery(true)
+  }, [])
+
+  const updatePassword = useCallback(async (password: string) => {
+    const { error } = await supabase.auth.updateUser({ password })
+    if (error) throw new Error(error.message)
+    setRecovery(false)
+  }, [])
+
+  const clearRecovery = useCallback(() => setRecovery(false), [])
 
   const signUp = useCallback(
     async (email: string, password: string, username: string) => {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        options: { data: { username } },
+        options: { data: { username }, emailRedirectTo: authRedirectUrl() },
       })
       if (error) throw new Error(error.message)
+      // Con confirmación obligatoria Supabase no devuelve sesión. Si el correo ya existía,
+      // devuelve un usuario sin identidades (para no revelar qué correos están registrados).
+      return { needsConfirmation: !data.session }
     },
     [],
   )
@@ -122,8 +178,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signOut,
       refreshProfile,
       updateProfile,
+      resendConfirmation,
+      requestPasswordReset,
+      verifyRecoveryCode,
+      updatePassword,
+      verifyMfa,
+      recovery,
+      clearRecovery,
+      notice,
+      setNotice,
     }),
-    [user, profile, loading, signIn, signUp, signOut, refreshProfile, updateProfile],
+    [user, profile, loading, signIn, signUp, signOut, refreshProfile, updateProfile, resendConfirmation,
+     requestPasswordReset, verifyRecoveryCode, updatePassword, verifyMfa, recovery, clearRecovery, notice],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

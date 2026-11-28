@@ -139,7 +139,13 @@ export default function MyListings() {
                 <div className="muted small">
                   {formatPrice(l.price_usd, l.currency, l.price_period)} · {l.price_period ? 'Alquiler' : `Stock ${l.stock}`} · {l.views} visitas · {timeAgo(l.created_at)}
                 </div>
-                <span className={`status-pill st-${l.status}`}>{STATUS_LABEL[l.status] ?? l.status}</span>
+                {l.blocked_at ? (
+                  <span className="status-pill st-blocked" title={l.blocked_reason ?? ''}>
+                    Bloqueado: {l.blocked_reason || 'incumple las normas'}
+                  </span>
+                ) : (
+                  <span className={`status-pill st-${l.status}`}>{STATUS_LABEL[l.status] ?? l.status}</span>
+                )}
                 {l.featured && l.status === 'active' && (
                   <span className="status-pill st-featured">
                     <Star size={11} /> Destacado

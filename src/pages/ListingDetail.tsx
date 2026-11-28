@@ -14,6 +14,7 @@ import { LoadingBlock, EmptyState, Alert } from '../components/Pagination'
 import { useAuth } from '../context/AuthContext'
 import { useCart } from '../context/CartContext'
 import { PlanBadge, useSellerBadges } from '../components/PlanBadge'
+import { ReportButton, SafetyTips } from '../components/Security'
 
 export default function ListingDetail() {
   const { id } = useParams<{ id: string }>()
@@ -198,6 +199,13 @@ export default function ListingDetail() {
         {category ? <Link to={`/categoria/${category.slug}`}>{category.name}</Link> : 'Anuncios'} <span>/</span>{' '}
         <span className="crumb-current">{listing.title}</span>
       </nav>
+
+      {listing.blocked_at && (
+        <Alert kind="error">
+          <strong>Anuncio bloqueado por moderación.</strong> Motivo: {listing.blocked_reason || 'incumple las normas'}. No es
+          visible para los compradores. Si crees que es un error, escribe al administrador.
+        </Alert>
+      )}
 
       <div className="detail-top">
         <div className="gallery panel">
@@ -420,13 +428,22 @@ export default function ListingDetail() {
               <h3 className="panel-title">Mensaje al vendedor</h3>
               {user ? (
                 <form className="msg-form" onSubmit={sendMessage}>
-                  <textarea rows={3} placeholder="Hola, ¿todavía está disponible?" value={body} onChange={(e) => setBody(e.target.value)} required />
+                  <textarea rows={3} maxLength={2000} placeholder="Hola, ¿todavía está disponible?" value={body} onChange={(e) => setBody(e.target.value)} required />
                   <button type="submit" className="btn btn-primary" disabled={busy}>Enviar mensaje</button>
                 </form>
               ) : (
                 <Link to="/entrar" className="btn btn-primary btn-block">Entra para escribir</Link>
               )}
             </div>
+          )}
+
+          {!isOwner && (
+            <>
+              <SafetyTips />
+              <div className="report-row">
+                <ReportButton listingId={listing.id} label="Denunciar anuncio" />
+              </div>
+            </>
           )}
         </aside>
       </div>

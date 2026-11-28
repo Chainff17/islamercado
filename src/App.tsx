@@ -19,7 +19,10 @@ import Orders from './pages/Orders'
 import MyListings from './pages/MyListings'
 import Categories from './pages/Categories'
 import Plans from './pages/Plans'
+import SafetyPage from './pages/Safety'
 import { LoadingBlock } from './components/Pagination'
+import RecoverPassword, { ResetPassword } from './pages/RecoverPassword'
+import { AuthLinkHandler, GlobalNotices } from './components/Security'
 
 // El mapa (Leaflet) se descarga solo cuando se visita: ahorra datos en la portada.
 const MapPage = lazy(() => import('./pages/MapPage'))
@@ -38,8 +41,10 @@ export default function App() {
   return (
     <div className="app-shell">
       <ScrollToTop />
+      <AuthLinkHandler />
       <Header />
       <main className="main-content container">
+        <GlobalNotices />
         <Suspense fallback={<LoadingBlock />}>
           <Routes>
             <Route path="/" element={<Home />} />
@@ -61,9 +66,12 @@ export default function App() {
             <Route path="/mis-publicaciones" element={<MyListings />} />
             <Route path="/entrar" element={<Login />} />
             <Route path="/registro" element={<Register />} />
+            <Route path="/recuperar" element={<RecoverPassword />} />
+            <Route path="/restablecer" element={<ResetPassword />} />
             <Route path="/perfil" element={<Profile />} />
             <Route path="/planes" element={<Plans />} />
             <Route path="/admin" element={<Admin />} />
+            <Route path="/seguridad" element={<SafetyPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Suspense>
@@ -94,6 +102,12 @@ export default function App() {
             <Link to="/publicar">Publicar anuncio</Link>
             <Link to="/mis-publicaciones">Mis anuncios</Link>
             <Link to="/mis-ventas">Mis ventas</Link>
+          </nav>
+          <nav>
+            <strong>Seguridad</strong>
+            <Link to="/seguridad">Compra seguro</Link>
+            <Link to="/perfil">Verificación en 2 pasos</Link>
+            <Link to="/recuperar">Recuperar contraseña</Link>
           </nav>
           <nav>
             <strong>Mi cuenta</strong>

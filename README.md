@@ -152,3 +152,26 @@ o como *variables* del repositorio en GitHub, esos valores tienen prioridad.
 - `site_url`: `https://chainff17.github.io/islamercado/`
 - Redirectos permitidos: la URL de producción (`/islamercado` y `/*`) y la del Gestor.
 - Registro con email enabled, `mailer_autoconfirm=true`, refresh token rotación.
+
+## Seguridad y moderación
+
+Migración: `supabase/migrations/20261128004524_security_moderation.sql` (aplicada en Supabase).
+
+**Base de datos (no se puede saltar desde el navegador):**
+- `user_bans` + `admin_ban_user` / `admin_unban_user`: la cuenta suspendida no puede entrar (`auth.users.banned_until`), publicar, comprar, preguntar, opinar ni escribir; sus anuncios dejan de verse.
+- `listings.blocked_at/blocked_reason` + `admin_block_listing` / `admin_unblock_listing`: el anuncio bloqueado solo lo ve su dueño (con el motivo).
+- `reports` + `report_content(...)`: denuncias de anuncios o usuarios (máx. 10/día, sin duplicados) y `admin_list_reports` / `admin_resolve_report`.
+- `admin_audit`: registro inalterable de cada acción del administrador (suspensiones, bloqueos, pagos aprobados, cambios de planes/ajustes).
+- Límites anti-spam: 15 mensajes/min y 300/día, 10 preguntas/hora, 30 anuncios/día, 30 pedidos/hora.
+- Integridad: el destinatario solo puede marcar un mensaje como leído; el vendedor solo puede responder preguntas (no editarlas) ni preguntar en su propio anuncio; las opiniones exigen un pedido **entregado**; el vendedor no puede tocar visitas, fecha ni bloqueo; las fotos deben estar en su propia carpeta del Storage; nombres reservados (`admin`, `soporte`, `islamercado`…) y teléfonos validados.
+- `is_admin()` exige **AAL2** (código de 2 pasos verificado) si el administrador tiene 2FA activado.
+- Bucket `listing-images`: máx. 8 MB y solo JPG/PNG/WebP/GIF.
+
+**Web:** contraseña de 8+ caracteres con letras y números y medidor de fuerza, confirmación de correo, “¿Olvidaste tu contraseña?” (`/recuperar`, `/restablecer`), 2FA con app de autenticación (Perfil → Seguridad), aviso de cuenta suspendida, botones *Denunciar*, consejos de compra segura, página `/seguridad`, pestañas *Denuncias*, *Usuarios* y *Registro* en `/admin`, y Content-Security-Policy en el build.
+
+**Pendiente en el panel de Supabase (no se puede hacer por API desde aquí):**
+1. *Authentication → Emails → SMTP Settings*: configurar un SMTP real (Brevo, Resend, Gmail con contraseña de aplicación…). El host actual no es válido, y sin SMTP no llegan los correos de confirmación ni de recuperación.
+2. Después: *Authentication → Sign In / Providers → Email* → activar **Confirm email**.
+3. *Authentication → Policies/Passwords*: longitud mínima **8**, “letters and digits” y (plan Pro) “Prevent leaked passwords”.
+4. *Sign In / Providers → Apple*: desactivar (está activado con un client ID de prueba).
+5. *Emails → Templates*: traducir al español; activar las notificaciones de “contraseña cambiada” y “correo cambiado”.

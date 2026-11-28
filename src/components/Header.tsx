@@ -23,6 +23,7 @@ import {
   HelpCircle,
   ShieldCheck,
   Sparkles,
+  Flag,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useCart } from '../context/CartContext'
@@ -65,7 +66,7 @@ interface Counts {
 export default function Header() {
   const { user, profile, signOut } = useAuth()
   const { count: cartCount } = useCart()
-  const { status: sellerStatus, plan, isAdmin, refresh: refreshSeller } = useSeller()
+  const { status: sellerStatus, plan, isAdmin, adminRole, refresh: refreshSeller } = useSeller()
   const { province, setProvince, ahorro, toggleAhorro } = usePrefs()
   const navigate = useNavigate()
   const [params] = useSearchParams()
@@ -121,7 +122,8 @@ export default function Header() {
   }
 
   const pendingReviews = isAdmin ? sellerStatus?.pending_reviews ?? 0 : 0
-  const totalNotifs = counts.messages + counts.sales + counts.questions + pendingReviews
+  const openReports = isAdmin ? sellerStatus?.open_reports ?? 0 : 0
+  const totalNotifs = counts.messages + counts.sales + counts.questions + pendingReviews + openReports
   const displayName = profile?.username || user?.email?.split('@')[0] || 'Mi cuenta'
 
   return (
@@ -186,6 +188,7 @@ export default function Header() {
                   <NotifItem to="/mis-ventas" icon={<Receipt size={17} />} label="Ventas por confirmar" n={counts.sales} />
                   <NotifItem to="/mis-publicaciones" icon={<HelpCircle size={17} />} label="Preguntas sin responder" n={counts.questions} />
                   {isAdmin && <NotifItem to="/admin" icon={<ShieldCheck size={17} />} label="Pagos de planes por aprobar" n={pendingReviews} />}
+                  {isAdmin && <NotifItem to="/admin?tab=reports" icon={<Flag size={17} />} label="Denuncias por revisar" n={openReports} />}
                   {totalNotifs === 0 && <p className="menu-empty">Estás al día. ¡Nada pendiente!</p>}
                 </div>
               )}
@@ -203,10 +206,10 @@ export default function Header() {
                       <strong>{displayName}</strong>
                       <span>{user.email}</span>
                     </div>
-                    {isAdmin && (
+                    {adminRole && (
                       <Link to="/admin" className="menu-item menu-admin">
                         <ShieldCheck size={16} /> Administración
-                        {pendingReviews > 0 && <span className="menu-count">{pendingReviews}</span>}
+                        {pendingReviews + openReports > 0 && <span className="menu-count">{pendingReviews + openReports}</span>}
                       </Link>
                     )}
                     <Link to="/planes" className="menu-item">

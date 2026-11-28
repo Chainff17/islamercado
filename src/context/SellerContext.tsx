@@ -16,6 +16,10 @@ interface SellerValue {
   /** Plan vigente (null si no tiene) */
   plan: Plan | null
   isAdmin: boolean
+  /** Es administrador aunque falte verificar el 2FA en esta sesión */
+  adminRole: boolean
+  /** Cuenta suspendida */
+  banned: boolean
   /** Puede publicar: admin o plan vigente */
   canSell: boolean
   refresh: () => Promise<void>
@@ -60,6 +64,8 @@ export function SellerProvider({ children }: { children: ReactNode }) {
   const value = useMemo<SellerValue>(() => {
     const plan = status?.subscription ? plans.find((p) => p.id === status.subscription!.plan_id) ?? null : null
     const isAdmin = !!status?.is_admin
+    const adminRole = isAdmin || !!status?.admin_role
+    const banned = !!status?.banned
     const rate = Number(settings.cup_rate) || DEFAULT_CUP_RATE
     return {
       loading,
@@ -69,7 +75,9 @@ export function SellerProvider({ children }: { children: ReactNode }) {
       status,
       plan,
       isAdmin,
-      canSell: isAdmin || !!plan,
+      adminRole,
+      banned,
+      canSell: !banned && (adminRole || !!plan),
       refresh,
       reloadCatalog,
     }
