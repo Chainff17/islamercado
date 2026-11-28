@@ -1,13 +1,100 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Heart, MessageCircle, Package, Plus, ShoppingBag, ShoppingCart, Store } from 'lucide-react'
+import { Heart, KeyRound, MessageCircle, Package, Plus, ShoppingBag, ShoppingCart, Store } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { initials } from '../lib/format'
 import { LoadingBlock, EmptyState, Alert } from '../components/Pagination'
+import { useSeller } from '../context/SellerContext'
+import { PasswordInput, PasswordStrength, TwoFactorPanel } from '../components/Security'
+import { authErrorEs, checkPassword } from '../lib/authSecurity'
+
+/** Cambiar contraseña desde el perfil (pide la actual si la sesión no está verificada con 2FA). */
+function ChangePassword({ email }: { email: string }) {
+  const { updatePassword } = useAuth()
+  const { status } = useSeller()
+  const [open, setOpen] = useState(false)
+  const [cur, setCur] = useState('')
+  const [pw, setPw] = useState('')
+  const [confirm, setConfirm] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [ok, setOk] = useState('')
+  const needsCurrent = !status?.mfa_enrolled
+
+  async function submit(e: FormEvent) {
+    e.preventDefault()
+    setError('')
+    setOk('')
+    const check = checkPassword(pw, [email.split('@')[0]])
+    if (!check.ok) return setError(`La contraseña no es segura: ${check.issues.join(', ').toLowerCase()}.`)
+    if (pw !== confirm) return setError('Las contraseñas no coinciden.')
+    if (needsCurrent && pw === cur) return setError('La nueva contraseña debe ser distinta de la actual.')
+    setBusy(true)
+    try {
+      if (needsCurrent) {
+        const { error: e1 } = await supabase.auth.signInWithPassword({ email, password: cur })
+        if (e1) throw new Error(/invalid login/i.test(e1.message) ? 'La contraseña actual no es correcta.' : e1.message)
+      }
+      await updatePassword(pw)
+      setOk('Contraseña actualizada.')
+      setCur('')
+      setPw('')
+      setConfirm('')
+      setOpen(false)
+    } catch (err) {
+      setError(authErrorEs(err, 'No se pudo cambiar la contraseña.'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="card security-card">
+      <h3 className="card-h">
+        <KeyRound size={18} /> Contraseña
+      </h3>
+      {ok && <Alert kind="success">{ok}</Alert>}
+      {!open ? (
+        <button type="button" className="btn btn-outline" onClick={() => setOpen(true)}>
+          Cambiar contraseña
+        </button>
+      ) : (
+        <form className="form" onSubmit={submit}>
+          {needsCurrent && (
+            <label className="field">
+              <span>Contraseña actual</span>
+              <PasswordInput value={cur} onChange={setCur} />
+            </label>
+          )}
+          <label className="field">
+            <span>Contraseña nueva</span>
+            <PasswordInput value={pw} onChange={setPw} autoComplete="new-password" placeholder="Mínimo 8 caracteres" />
+            <PasswordStrength password={pw} context={[email.split('@')[0]]} />
+          </label>
+          <label className="field">
+            <span>Repite la contraseña nueva</span>
+            <PasswordInput value={confirm} onChange={setConfirm} autoComplete="new-password" />
+          </label>
+          {error && <Alert kind="error">{error}</Alert>}
+          <div className="form-actions">
+            <button type="submit" className="btn btn-primary" disabled={busy}>
+              {busy ? 'Guardando…' : 'Guardar'}
+            </button>
+            <button type="button" className="btn btn-ghost" onClick={() => setOpen(false)}>
+              Cancelar
+            </button>
+          </div>
+        </form>
+      )}
+    </div>
+  )
+}
 
 export default function Profile() {
   const { user, profile, loading, updateProfile, signOut } = useAuth()
+  const { status } = useSeller()
+  const [saved, setSaved] = useState(false)
   const navigate = useNavigate()
   const [form, setForm] = useState({ username: '', phone: '' })
   const [saving, setSaving] = useState(false)
@@ -47,12 +134,19 @@ export default function Profile() {
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
     setError('')
+    setSaved(false)
+    const phone = form.phone.trim()
+    if (phone && !/^\+?[0-9 ()-]{6,20}$/.test(phone)) {
+      setError('El teléfono no es válido. Usa solo números, por ejemplo +53 5 1234567.')
+      return
+    }
     setSaving(true)
     try {
       await updateProfile({
         username: form.username.trim() || null,
         phone: form.phone.trim() || null,
       })
+      setSaved(true)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo actualizar.')
     } finally {
@@ -108,6 +202,7 @@ export default function Profile() {
           </label>
 
           {error && <Alert kind="error">{error}</Alert>}
+          {saved && <Alert kind="success">Cambios guardados.</Alert>}
 
           <div className="form-actions">
             <button type="submit" className="btn btn-primary" disabled={saving}>
@@ -143,6 +238,12 @@ export default function Profile() {
             <Heart size={18} className="pl-icon" /> Favoritos
           </Link>
         </div>
+      </div>
+
+      <h2 className="section-h security-h">Seguridad de la cuenta</h2>
+      <div className="security-grid">
+        <ChangePassword email={user.email} />
+        <TwoFactorPanel highlight={!!status?.admin_role} />
       </div>
     </div>
   )

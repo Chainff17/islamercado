@@ -26,4 +26,13 @@ function pick(value: string | undefined, fallback: string): string {
 const url = pick(import.meta.env.VITE_SUPABASE_URL, PUBLIC_SUPABASE_URL)
 const anonKey = pick(import.meta.env.VITE_SUPABASE_ANON_KEY, PUBLIC_SUPABASE_ANON_KEY)
 
-export const supabase: SupabaseClient = createClient(url, anonKey)
+/**
+ * Hash con el que se abrió la página, capturado ANTES de crear el cliente: los enlaces de
+ * los correos (confirmar cuenta, recuperar contraseña) llegan como #access_token=…&type=…
+ * o #error=…, y con HashRouter hay que redirigir a una ruta válida después de procesarlos.
+ */
+export const INITIAL_URL_HASH = typeof window !== 'undefined' ? window.location.hash : ''
+
+export const supabase: SupabaseClient = createClient(url, anonKey, {
+  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
+})

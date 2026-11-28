@@ -6,6 +6,7 @@ import type { Listing, Profile, Review } from '../lib/types'
 import ListingCard from '../components/ListingCard'
 import { Stars, ReviewItem } from '../components/Stars'
 import { LoadingBlock, EmptyState } from '../components/Pagination'
+import { ReportButton } from '../components/Security'
 import { PlanBadge, useSellerBadges } from '../components/PlanBadge'
 
 export default function SellerProfile() {
@@ -85,6 +86,9 @@ export default function SellerProfile() {
             <span>{listings.length} publicación(es)</span>
           </div>
           {seller.phone && <p className="seller-phone"><Phone size={15} /> {seller.phone}</p>}
+        </div>
+        <div className="seller-header-report">
+          <ReportButton userId={seller.id} label="Denunciar vendedor" compact />
         </div>
       </div>
 

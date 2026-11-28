@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import {
   CalendarPlus,
   Check,
@@ -28,8 +28,11 @@ import {
 import { formatAmount, whatsappLink } from '../lib/cuba'
 import { formatDate, timeAgo } from '../lib/format'
 import { Alert, EmptyState, LoadingBlock } from '../components/Pagination'
+import { MfaChallenge } from '../components/Security'
+import { AuditTab, ReportsTab, UsersTab } from './AdminModeration'
 
-type Tab = 'pending' | 'active' | 'history' | 'grant' | 'config'
+type Tab = 'pending' | 'active' | 'history' | 'grant' | 'config' | 'reports' | 'users' | 'audit'
+const TABS: Tab[] = ['pending', 'active', 'history', 'grant', 'config', 'reports', 'users', 'audit']
 
 function money(n: number, cur: string) {
   return `${formatAmount(Number(n))} ${cur}`
@@ -37,8 +40,18 @@ function money(n: number, cur: string) {
 
 export default function Admin() {
   const { user, loading: authLoading } = useAuth()
-  const { isAdmin, loading: sellerLoading, plans, refresh, reloadCatalog } = useSeller()
-  const [tab, setTab] = useState<Tab>('pending')
+  const { isAdmin, adminRole, status, loading: sellerLoading, plans, refresh, reloadCatalog } = useSeller()
+  const [params, setParams] = useSearchParams()
+  const qTab = params.get('tab') as Tab | null
+  const [tab, setTabState] = useState<Tab>(qTab && TABS.includes(qTab) ? qTab : 'pending')
+  const setTab = useCallback(
+    (t: Tab) => {
+      setTabState(t)
+      setParams(t === 'pending' ? {} : { tab: t }, { replace: true })
+    },
+    [setParams],
+  )
+  const openReports = status?.open_reports ?? 0
   const [rows, setRows] = useState<AdminSubscriptionRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -92,6 +105,18 @@ export default function Admin() {
 
   if (authLoading || sellerLoading) return <LoadingBlock />
   if (!user) return <EmptyState title="Inicia sesión" action={<Link to="/entrar" className="btn btn-primary">Entrar</Link>} />
+  if (adminRole && !isAdmin)
+    return (
+      <div className="auth-wrap">
+        <div className="auth-card">
+          <MfaChallenge onDone={() => refresh()} title="Confirma que eres tú">
+            <p className="auth-sub">
+              El panel de administración está protegido con verificación en 2 pasos. Escribe el código de 6 dígitos de tu app.
+            </p>
+          </MfaChallenge>
+        </div>
+      </div>
+    )
   if (!isAdmin)
     return (
       <EmptyState
@@ -112,12 +137,20 @@ export default function Admin() {
           <h1 className="page-title">
             <ShieldCheck size={24} strokeWidth={1.6} className="title-icon" /> Administración
           </h1>
-          <p className="page-sub">Aprueba los pagos de los vendedores y gestiona sus planes.</p>
+          <p className="page-sub">Aprueba pagos, gestiona planes y modera denuncias y usuarios.</p>
         </div>
         <Link to="/planes" className="btn btn-outline">
           Ver página de planes
         </Link>
       </div>
+
+      {!status?.mfa_enrolled && (
+        <Alert kind="error">
+          <strong>Protege el panel:</strong> activa la verificación en 2 pasos en{' '}
+          <Link to="/perfil">Mi perfil → Seguridad</Link>. Así nadie podrá aprobar pagos ni suspender usuarios aunque
+          descubra tu contraseña.
+        </Alert>
+      )}
 
       <div className="stats-row admin-stats">
         <div className={`stat ${groups.pending.length ? 'stat-alert' : ''}`}>
@@ -146,6 +179,9 @@ export default function Admin() {
             ['history', 'Historial'],
             ['grant', 'Alta directa'],
             ['config', 'Planes y pagos'],
+            ['reports', `Denuncias${openReports ? ` (${openReports})` : ''}`],
+            ['users', 'Usuarios'],
+            ['audit', 'Registro'],
           ] as Array<[Tab, string]>
         ).map(([id, label]) => (
           <button key={id} type="button" className={`tab ${tab === id ? 'tab-on' : ''}`} onClick={() => setTab(id)}>
@@ -249,6 +285,10 @@ export default function Admin() {
             </table>
           </div>
         ))}
+
+      {tab === 'reports' && <ReportsTab onDone={afterAction} onError={setError} />}
+      {tab === 'users' && <UsersTab onDone={afterAction} onError={setError} />}
+      {tab === 'audit' && <AuditTab onError={setError} />}
 
       {tab === 'grant' && <GrantForm plans={plans} onDone={afterAction} onError={setError} />}
 

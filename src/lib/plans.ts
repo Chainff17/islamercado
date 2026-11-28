@@ -41,7 +41,18 @@ export interface Subscription {
 
 /** Respuesta de la RPC my_seller_status() */
 export interface SellerStatus {
+  /** Admin con acceso efectivo (si tiene 2FA, solo tras verificar el código en esta sesión) */
   is_admin: boolean
+  /** Está en la lista de administradores (aunque falte verificar el 2FA) */
+  admin_role?: boolean
+  /** Tiene la verificación en 2 pasos activada */
+  mfa_enrolled?: boolean
+  /** Cuenta suspendida */
+  banned?: { reason: string; since: string } | null
+  /** Anuncios bloqueados por moderación */
+  blocked_listings?: number
+  /** Denuncias abiertas (solo admin) */
+  open_reports?: number
   subscription: Subscription | null
   pending: Subscription | null
   last: Subscription | null

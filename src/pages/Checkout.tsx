@@ -8,6 +8,7 @@ import { storageUrl } from '../lib/images'
 import { PAYMENT_METHODS, PROVINCES, asCurrency, formatMoney } from '../lib/cuba'
 import Price from '../components/Price'
 import { CreditCard, MapPin, ShieldCheck } from 'lucide-react'
+import { SafetyTips } from '../components/Security'
 import { LoadingBlock, EmptyState, Alert } from '../components/Pagination'
 
 interface Line {
@@ -168,6 +169,7 @@ export default function Checkout() {
             {saving ? 'Procesando…' : 'Confirmar compra'}
           </button>
           <p className="hint inline-icons"><ShieldCheck size={14} /> Puedes cancelar mientras el pedido esté pendiente.</p>
+          <SafetyTips variant="checkout" />
         </aside>
       </form>
     </div>
